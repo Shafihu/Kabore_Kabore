@@ -1,14 +1,17 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import axios from "axios";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -38,7 +41,7 @@ interface ImageAsset {
   height?: number;
 }
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
@@ -47,34 +50,113 @@ export default function App() {
   const [questions, setQuestions] = useState<any>("");
   const [answers, setAnswers] = useState("");
   const [viewImage, setViewImage] = useState(false);
+  const [viewSelectedImage, setViewSelectedImage] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [showManualUpload, setShowManualUpload] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const [showGuide, setShowGuide] = useState(true);
+  const [showSetup, setShowSetup] = useState(true);
+  const [scanMode, setScanMode] = useState<"camera" | "upload">("camera");
   const cameraRef = useRef<CameraView>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+  // Function to enforce 4:3 aspect ratio
+  const enforceAspectRatio = async (imageUri: string): Promise<string> => {
+    try {
+      const imageInfo = await ImageManipulator.manipulateAsync(imageUri, [], {
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
 
-    if (!result.canceled && result.assets?.[0]) {
-      setImage(result.assets[0].uri);
-      setResult(null);
+      const { width: imgWidth, height: imgHeight } = imageInfo;
+      const targetRatio = 4 / 3;
+      const currentRatio = imgWidth / imgHeight;
+
+      let cropWidth = imgWidth;
+      let cropHeight = imgHeight;
+      let originX = 0;
+      let originY = 0;
+
+      if (currentRatio > targetRatio) {
+        cropWidth = imgHeight * targetRatio;
+        originX = (imgWidth - cropWidth) / 2;
+      } else if (currentRatio < targetRatio) {
+        cropHeight = imgWidth / targetRatio;
+        originY = (imgHeight - cropHeight) / 2;
+      }
+
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          {
+            crop: {
+              originX,
+              originY,
+              width: cropWidth,
+              height: cropHeight,
+            },
+          },
+          {
+            resize: {
+              width: 800,
+              height: 600,
+            },
+          },
+        ],
+        {
+          compress: 0.9,
+          format: ImageManipulator.SaveFormat.JPEG,
+        }
+      );
+
+      return manipulatedImage.uri;
+    } catch (error) {
+      console.error("Error enforcing aspect ratio:", error);
+      return imageUri;
     }
   };
 
-  const takePhoto = async () => {
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+  // Pulse animation for guide
+  React.useEffect(() => {
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => pulse());
+    };
+    pulse();
+  }, []);
 
-    if (!result.canceled && result.assets?.[0]) {
-      setImage(result.assets[0].uri);
-      setResult(null);
+  const startScanning = (mode: "camera" | "upload") => {
+    if (!questions || questions < 1 || questions > 60) {
+      Alert.alert("Error", "Please enter valid number of questions (1-60)");
+      return;
+    }
+
+    if (!answers || answers.length !== Number.parseInt(questions)) {
+      Alert.alert(
+        "Error",
+        `Please provide exactly ${questions} answers (A-E).`
+      );
+      return;
+    }
+
+    setScanMode(mode);
+    setShowSetup(false);
+
+    if (mode === "camera") {
+      openCamera();
+    } else {
+      // Directly open gallery for upload mode
+      pickImageFromGallery();
     }
   };
 
@@ -95,35 +177,61 @@ export default function App() {
     }
 
     setShowCamera(true);
+    setShowGuide(true);
+  };
+
+  const pickImageFromGallery = async () => {
+    setResult(null);
+    setImage(null);
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        setShowManualUpload(true); // Show upload screen with loading
+        setLoading(true);
+        const processedImageUri = await enforceAspectRatio(
+          result.assets[0].uri
+        );
+        await processImage(processedImageUri);
+      } else {
+        // User cancelled, go back to setup
+        setShowManualUpload(false);
+        setShowSetup(true);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to pick image from gallery");
+      setShowManualUpload(false);
+      setShowSetup(true);
+    }
   };
 
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
+        setLoading(true);
         const photo = await cameraRef.current.takePictureAsync({
           quality: 1,
           base64: false,
+          skipProcessing: true,
+          exif: false,
         });
-        setImage(photo.uri);
-        setResult(null);
-        setShowCamera(false);
+
+        const processedImageUri = await enforceAspectRatio(photo.uri);
+        await processImage(processedImageUri);
       } catch (error) {
         Alert.alert("Error", "Failed to take picture");
+        setLoading(false);
       }
     }
   };
 
-  const uploadImage = async () => {
-    if (!image) {
-      Alert.alert("Error", "Please select an image first.");
-      return;
-    }
-
-    if (!questions || questions < 1 || questions > 60) {
-      Alert.alert("Error", "Please enter valid number of questions (1-60)");
-      return;
-    }
-
+  const processImage = async (imageUri: string) => {
     const convertedAnswers = answers
       .toUpperCase()
       .split("")
@@ -133,19 +241,9 @@ export default function App() {
       })
       .filter((ans) => ans !== null);
 
-    if (convertedAnswers.length !== Number.parseInt(questions)) {
-      Alert.alert(
-        "Error",
-        `Please provide exactly ${questions} answers (A-E).`
-      );
-      return;
-    }
-
-    setLoading(true);
-
     const formData = new FormData();
     formData.append("image", {
-      uri: image,
+      uri: imageUri,
       name: "exam_sheet.jpg",
       type: "image/jpeg",
     } as any);
@@ -162,6 +260,7 @@ export default function App() {
       );
 
       setResult(response.data);
+      setImage(imageUri);
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.error || "Processing failed");
     } finally {
@@ -169,59 +268,279 @@ export default function App() {
     }
   };
 
-  const renderResult = () => {
+  const scanAgain = () => {
+    setResult(null);
+    setImage(null);
+    setLoading(false);
+  };
+
+  const goBackToSetup = () => {
+    setShowCamera(false);
+    setShowManualUpload(false);
+    setShowSetup(true);
+    setResult(null);
+    setImage(null);
+  };
+
+  const renderCameraGuide = () => {
+    return (
+      <View style={styles.guideContainer}>
+        <Animated.View
+          style={[
+            styles.instructionContainer,
+            { transform: [{ scale: pulseAnim }] },
+          ]}
+        >
+          <View style={styles.instructionBox}>
+            <Text style={styles.instructionTitle}>
+              📋 Position Answer Sheet
+            </Text>
+            <Text style={styles.instructionText}>
+              • Align within the 4:3 frame{"\n"}• Ensure good lighting{"\n"}•
+              Keep sheet flat and visible
+            </Text>
+          </View>
+        </Animated.View>
+
+        <TouchableOpacity
+          style={styles.toggleGuideButton}
+          onPress={() => setShowGuide(!showGuide)}
+        >
+          <Text style={styles.toggleGuideText}>
+            {showGuide ? "Hide Guide" : "Show Guide"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderBriefResults = () => {
+    if (!result) return null;
+
+    const percentage = result.total
+      ? Math.round((result.correct / result.total) * 100)
+      : 0;
+
+    return (
+      <View style={styles.briefResultsOverlay}>
+        <LinearGradient
+          colors={["rgba(0, 0, 0, 0.8)", "rgba(0, 0, 0, 0.6)"]}
+          style={styles.briefResultsContainer}
+        >
+          <View style={styles.briefScoreSection}>
+            <View style={styles.briefScoreBox}>
+              <Text style={styles.briefScoreText}>{result.score}</Text>
+              <Text style={styles.briefScoreLabel}>Score</Text>
+            </View>
+
+            <View style={styles.briefStatsContainer}>
+              <Text style={styles.briefStatsText}>
+                {result.correct}/{result.total} Correct
+              </Text>
+              <Text style={styles.briefPercentageText}>{percentage}%</Text>
+            </View>
+
+            <Image
+              source={{ uri: result.image }}
+              style={styles.briefProcessedImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          <View style={styles.briefButtonsContainer}>
+            <TouchableOpacity
+              style={styles.scanAgainButton}
+              onPress={
+                scanMode === "camera"
+                  ? scanAgain
+                  : () => startScanning("upload")
+              }
+            >
+              <LinearGradient
+                colors={["#4299e1", "#3182ce"]}
+                style={styles.briefButtonGradient}
+              >
+                <Text style={styles.briefButtonText}>
+                  {scanMode === "camera" ? "📷 Scan Again" : "📁 Upload Again"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.advancedButton}
+              onPress={() => setShowDetailedResults(true)}
+            >
+              <LinearGradient
+                colors={["#48bb78", "#38a169"]}
+                style={styles.briefButtonGradient}
+              >
+                <Text style={styles.briefButtonText}>📊 Advanced</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
+  const renderDetailedResults = () => {
     if (!result) return null;
 
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.sectionTitle}>📊 Exam Results</Text>
-
-        <View style={styles.scoreContainer}>
+      <Modal visible={showDetailedResults} animationType="slide">
+        <View style={styles.detailedResultsContainer}>
           <LinearGradient
-            colors={["#4299e1", "#3182ce"]}
-            style={styles.scoreBox}
+            colors={["#1a365d", "#2d5a87", "#4299e1"]}
+            style={styles.detailedGradient}
           >
-            <Text style={styles.scoreText}>{result.score}</Text>
-            <Text style={styles.scoreLabel}>Score</Text>
-          </LinearGradient>
-
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
-              {result.correct || 0}/{result.total || 0} Correct Answers
-            </Text>
-            <View style={styles.progressBar}>
-              <LinearGradient
-                colors={["#48bb78", "#38a169"]}
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${
-                      result.total ? (result.correct / result.total) * 100 : 0
-                    }%`,
-                  },
-                ]}
-              />
+            <View style={styles.detailedHeader}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => setShowDetailedResults(false)}
+              >
+                <Text style={styles.backButtonText}>← Back</Text>
+              </TouchableOpacity>
+              <Text style={styles.detailedTitle}>Detailed Results</Text>
+              <View style={styles.placeholder} />
             </View>
-          </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>🖼️ Processed Answer Sheet</Text>
-        {result.image ? (
-          <TouchableOpacity
-            onPress={() => setViewImage(true)}
-            style={styles.imageCard}
-          >
-            <Image
-              source={{ uri: result.image }}
-              style={styles.processedImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        ) : (
-          <Text style={{ textAlign: "center", color: "tomato" }}>
-            Oops! nothing found
-          </Text>
-        )}
+            <ScrollView style={styles.detailedScrollView}>
+              <View style={styles.detailedScoreContainer}>
+                <LinearGradient
+                  colors={["#4299e1", "#3182ce"]}
+                  style={styles.detailedScoreBox}
+                >
+                  <Text style={styles.detailedScoreText}>{result.score}</Text>
+                  <Text style={styles.detailedScoreLabel}>Final Score</Text>
+                </LinearGradient>
+
+                <View style={styles.detailedProgressContainer}>
+                  <Text style={styles.detailedProgressText}>
+                    {result.correct || 0}/{result.total || 0} Correct Answers
+                  </Text>
+                  <View style={styles.detailedProgressBar}>
+                    <LinearGradient
+                      colors={["#48bb78", "#38a169"]}
+                      style={[
+                        styles.detailedProgressFill,
+                        {
+                          width: `${
+                            result.total
+                              ? (result.correct / result.total) * 100
+                              : 0
+                          }%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {result.image && (
+                <View style={styles.detailedImageSection}>
+                  <Text style={styles.detailedSectionTitle}>
+                    Processed Answer Sheet
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setViewImage(true)}
+                    style={styles.detailedImageCard}
+                  >
+                    <Image
+                      source={{ uri: result.image }}
+                      style={styles.detailedProcessedImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={styles.detailedTableSection}>
+                <Text style={styles.detailedSectionTitle}>
+                  Question by Question
+                </Text>
+                <View style={styles.tableContainer}>
+                  <View style={styles.tableHeader}>
+                    <Text
+                      style={[styles.tableHeaderText, styles.questionColumn]}
+                    >
+                      Q#
+                    </Text>
+                    <Text style={[styles.tableHeaderText, styles.answerColumn]}>
+                      Correct
+                    </Text>
+                    <Text style={[styles.tableHeaderText, styles.answerColumn]}>
+                      Student
+                    </Text>
+                    <Text style={[styles.tableHeaderText, styles.statusColumn]}>
+                      Status
+                    </Text>
+                  </View>
+
+                  {result.grading &&
+                    Array.isArray(result.grading) &&
+                    result.grading.map((isCorrect, index) => {
+                      const correctAnswers = answers.toUpperCase().split("");
+                      const correctAnswer = correctAnswers[index] || "-";
+                      const studentAnswer = isCorrect
+                        ? correctAnswer
+                        : correctAnswer === "A"
+                        ? "B"
+                        : "A";
+
+                      return (
+                        <View
+                          key={index}
+                          style={[
+                            styles.tableRow,
+                            index % 2 === 0 ? styles.evenRow : styles.oddRow,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.tableCellText,
+                              styles.questionColumn,
+                            ]}
+                          >
+                            {index + 1}
+                          </Text>
+                          <Text
+                            style={[styles.tableCellText, styles.answerColumn]}
+                          >
+                            {correctAnswer}
+                          </Text>
+                          <Text
+                            style={[styles.tableCellText, styles.answerColumn]}
+                          >
+                            {studentAnswer}
+                          </Text>
+                          <View
+                            style={[
+                              styles.tableCellText,
+                              styles.statusColumn,
+                              styles.statusCell,
+                            ]}
+                          >
+                            <LinearGradient
+                              colors={
+                                isCorrect
+                                  ? ["#48bb78", "#38a169"]
+                                  : ["#f56565", "#e53e3e"]
+                              }
+                              style={styles.statusIndicator}
+                            >
+                              <Text style={styles.statusText}>
+                                {isCorrect ? "✓" : "✗"}
+                              </Text>
+                            </LinearGradient>
+                          </View>
+                        </View>
+                      );
+                    })}
+                </View>
+              </View>
+            </ScrollView>
+          </LinearGradient>
+        </View>
 
         {result && (
           <ImageView
@@ -231,80 +550,7 @@ export default function App() {
             onRequestClose={() => setViewImage(false)}
           />
         )}
-
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-          📋 Detailed Results
-        </Text>
-        <View style={styles.tableContainer}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, styles.questionColumn]}>
-              Q#
-            </Text>
-            <Text style={[styles.tableHeaderText, styles.answerColumn]}>
-              Correct
-            </Text>
-            <Text style={[styles.tableHeaderText, styles.answerColumn]}>
-              Student
-            </Text>
-            <Text style={[styles.tableHeaderText, styles.statusColumn]}>
-              Status
-            </Text>
-          </View>
-
-          {result &&
-            result.grading &&
-            Array.isArray(result.grading) &&
-            result.grading.map((isCorrect, index) => {
-              const correctAnswers = answers.toUpperCase().split("");
-              const correctAnswer = correctAnswers[index] || "-";
-              const studentAnswer = isCorrect
-                ? correctAnswer
-                : correctAnswer === "A"
-                ? "B"
-                : "A";
-
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.tableRow,
-                    index % 2 === 0 ? styles.evenRow : styles.oddRow,
-                  ]}
-                >
-                  <Text style={[styles.tableCellText, styles.questionColumn]}>
-                    {index + 1}
-                  </Text>
-                  <Text style={[styles.tableCellText, styles.answerColumn]}>
-                    {correctAnswer}
-                  </Text>
-                  <Text style={[styles.tableCellText, styles.answerColumn]}>
-                    {studentAnswer}
-                  </Text>
-                  <View
-                    style={[
-                      styles.tableCellText,
-                      styles.statusColumn,
-                      styles.statusCell,
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={
-                        isCorrect
-                          ? ["#48bb78", "#38a169"]
-                          : ["#f56565", "#e53e3e"]
-                      }
-                      style={styles.statusIndicator}
-                    >
-                      <Text style={styles.statusText}>
-                        {isCorrect ? "✓" : "✗"}
-                      </Text>
-                    </LinearGradient>
-                  </View>
-                </View>
-              );
-            })}
-        </View>
-      </View>
+      </Modal>
     );
   };
 
@@ -312,189 +558,212 @@ export default function App() {
     return (
       <Modal visible={showCamera} animationType="slide">
         <View style={styles.cameraContainer}>
-          <CameraView ref={cameraRef} style={styles.camera} facing="back">
-            <LinearGradient
-              colors={[
-                "rgba(26, 54, 93, 0.3)",
-                "rgba(45, 90, 135, 0.2)",
-                "transparent",
-              ]}
-              style={styles.cameraOverlay}
-            >
-              <View style={styles.cameraHeader}>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setShowCamera(false)}
-                >
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-                <View style={styles.cameraTitleContainer}>
-                  <Text style={styles.cameraTitle}>
-                    Take Photo of Answer Sheet
-                  </Text>
-                </View>
-                <View style={styles.placeholder} />
+          {/* Top dark bar */}
+          <View style={styles.darkBar}>
+            <View style={styles.cameraHeader}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={goBackToSetup}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.cameraTitleContainer}>
+                <Text style={styles.cameraTitle}>Camera Scanner</Text>
               </View>
+              <View style={styles.placeholder} />
+            </View>
+          </View>
 
-              <View style={styles.cameraFooter}>
-                <View style={styles.captureButtonContainer}>
+          {/* Centered Camera View Container */}
+          <View style={styles.cameraViewContainer}>
+            {/* Camera View - NO CHILDREN */}
+            <CameraView
+              ref={cameraRef}
+              style={styles.centeredCamera}
+              facing="back"
+              ratio="4:3"
+              pictureSize="high"
+            />
+
+            {/* Overlays positioned absolutely on top of camera */}
+            {showGuide && !result && renderCameraGuide()}
+            {result && renderBriefResults()}
+          </View>
+
+          {/* Bottom dark bar */}
+          <View style={styles.darkBar}>
+            <View style={styles.cameraFooter}>
+              <View style={styles.captureButtonContainer}>
+                {!result && (
                   <TouchableOpacity
-                    style={styles.captureButton}
+                    style={[
+                      styles.captureButton,
+                      loading && styles.captureButtonDisabled,
+                    ]}
                     onPress={takePicture}
+                    disabled={loading}
                   >
-                    <LinearGradient
-                      colors={["#ffffff", "#f7fafc"]}
-                      style={styles.captureButtonInner}
-                    />
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="large" />
+                    ) : (
+                      <LinearGradient
+                        colors={["#ffffff", "#f7fafc"]}
+                        style={styles.captureButtonInner}
+                      />
+                    )}
                   </TouchableOpacity>
-                </View>
+                )}
               </View>
-            </LinearGradient>
-          </CameraView>
+            </View>
+          </View>
         </View>
+
+        {/* Detailed Results Modal - Outside camera modal */}
+        {renderDetailedResults()}
       </Modal>
     );
   };
 
-  return (
-    <View style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a365d" />
-      <LinearGradient
-        colors={["#1a365d", "#2d5a87", "#4299e1"]}
-        style={styles.gradient}
-      >
-        <KeyboardAvoidingView style={styles.keyboardView} behavior="padding">
-          <ScrollView
-            contentContainerStyle={styles.container}
-            showsVerticalScrollIndicator={false}
+  const renderManualUpload = () => {
+    return (
+      <Modal visible={showManualUpload} animationType="slide">
+        <View style={styles.uploadContainer}>
+          <LinearGradient
+            colors={["#1a365d", "#2d5a87", "#4299e1"]}
+            style={styles.uploadGradient}
           >
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>MCQ Marker</Text>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionSection}>
-              <Text style={styles.sectionTitle}>📷 Choose Input Method</Text>
-              <View style={styles.buttonGroup}>
-                <TouchableOpacity
-                  style={styles.glassButton}
-                  onPress={pickImage}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={[
-                      "rgba(255, 255, 255, 0.2)",
-                      "rgba(255, 255, 255, 0.1)",
-                    ]}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.buttonIcon}>📁</Text>
-                    <Text style={styles.buttonText}>Gallery</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.glassButton}
-                  onPress={openCamera}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={[
-                      "rgba(255, 255, 255, 0.2)",
-                      "rgba(255, 255, 255, 0.1)",
-                    ]}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.buttonIcon}>📷</Text>
-                    <Text style={styles.buttonText}>Camera</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.glassButton}
-                  onPress={takePhoto}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={[
-                      "rgba(255, 255, 255, 0.2)",
-                      "rgba(255, 255, 255, 0.1)",
-                    ]}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.buttonIcon}>📸</Text>
-                    <Text style={styles.buttonText}>Quick</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+            <View style={styles.uploadHeader}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={goBackToSetup}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.uploadTitleContainer}>
+                <Text style={styles.uploadTitle}>Processing Upload</Text>
               </View>
+              <View style={styles.placeholder} />
             </View>
 
-            {/* Image Preview */}
-            {image && (
-              <View style={styles.imageSection}>
-                <Text style={styles.sectionTitle}>🖼️ Selected Image</Text>
-                <View style={styles.imageCard}>
-                  <Image source={{ uri: image }} style={styles.previewImage} />
+            <View style={styles.uploadContent}>
+              {loading && !result && (
+                <View style={styles.uploadLoadingContainer}>
+                  <ActivityIndicator color="#fff" size="large" />
+                  <Text style={styles.uploadLoadingText}>
+                    Processing image...
+                  </Text>
+                </View>
+              )}
+
+              {result && renderBriefResults()}
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Detailed Results Modal */}
+        {renderDetailedResults()}
+      </Modal>
+    );
+  };
+
+  const renderSetup = () => {
+    return (
+      <View style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#1a365d" />
+        <LinearGradient
+          colors={["#1a365d", "#2d5a87", "#4299e1"]}
+          style={styles.gradient}
+        >
+          <KeyboardAvoidingView style={styles.keyboardView} behavior="padding">
+            <ScrollView
+              contentContainerStyle={styles.container}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.header}>
+                <Text style={styles.title}>MCQ Scanner Setup</Text>
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.sectionTitle}>📝 Exam Configuration</Text>
+
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputLabel}>Number of Questions</Text>
+                  <TextInput
+                    style={styles.glassInput}
+                    placeholder="Enter 1-60"
+                    placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                    keyboardType="number-pad"
+                    value={questions}
+                    onChangeText={setQuestions}
+                  />
+                </View>
+
+                <View style={styles.inputCard}>
+                  <Text style={styles.inputLabel}>Answer Key</Text>
+                  <TextInput
+                    style={styles.glassInput}
+                    placeholder="e.g., ABCDE"
+                    placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                    value={answers}
+                    onChangeText={setAnswers}
+                  />
+                </View>
+
+                <View style={styles.scanModeSection}>
+                  <Text style={styles.sectionTitle}>
+                    📷 Choose Scanning Mode
+                  </Text>
+
+                  <View style={styles.modeButtonsContainer}>
+                    <TouchableOpacity
+                      style={styles.modeButton}
+                      onPress={() => startScanning("camera")}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={["#4299e1", "#3182ce"]}
+                        style={styles.modeButtonGradient}
+                      >
+                        <Text style={styles.modeButtonIcon}>📷</Text>
+                        <Text style={styles.modeButtonTitle}>Camera Mode</Text>
+                        <Text style={styles.modeButtonText}>
+                          Use live camera to scan answer sheets
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.modeButton}
+                      onPress={() => startScanning("upload")}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={["#48bb78", "#38a169"]}
+                        style={styles.modeButtonGradient}
+                      >
+                        <Text style={styles.modeButtonIcon}>📁</Text>
+                        <Text style={styles.modeButtonTitle}>Upload Mode</Text>
+                        <Text style={styles.modeButtonText}>
+                          Select existing images from gallery
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            )}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </LinearGradient>
+      </View>
+    );
+  };
 
-            {/* Input Form */}
-            <View style={styles.formSection}>
-              <Text style={styles.sectionTitle}>📝 Exam Details</Text>
-
-              <View style={styles.inputCard}>
-                <Text style={styles.inputLabel}>Number of Questions</Text>
-                <TextInput
-                  style={styles.glassInput}
-                  placeholder="Enter 1-60"
-                  placeholderTextColor="rgba(255, 255, 255, 0.6)"
-                  keyboardType="number-pad"
-                  value={questions}
-                  onChangeText={setQuestions}
-                />
-              </View>
-
-              <View style={styles.inputCard}>
-                <Text style={styles.inputLabel}>Answer Key</Text>
-                <TextInput
-                  style={styles.glassInput}
-                  placeholder="e.g., ABCDE"
-                  placeholderTextColor="rgba(255, 255, 255, 0.6)"
-                  value={answers}
-                  onChangeText={setAnswers}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.processButton}
-                onPress={uploadImage}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={["#48bb78", "#38a169"]}
-                  style={styles.processButtonGradient}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Text style={styles.processButtonIcon}>🚀</Text>
-                      <Text style={styles.processButtonText}>Process Exam</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            {renderResult()}
-            {renderCamera()}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </LinearGradient>
-    </View>
+  return (
+    <>
+      {showSetup && renderSetup()}
+      {renderCamera()}
+      {renderManualUpload()}
+    </>
   );
 }
 
@@ -520,19 +789,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     paddingTop: 10,
   },
-  backButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-  backButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
   title: {
     fontSize: 28,
     fontWeight: "bold",
@@ -540,58 +796,12 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  actionSection: {
-    marginBottom: 30,
-  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "white",
     marginBottom: 16,
     textAlign: "center",
-  },
-  buttonGroup: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  glassButton: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  buttonGradient: {
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 80,
-  },
-  buttonIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  imageSection: {
-    marginBottom: 30,
-  },
-  imageCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  previewImage: {
-    width: width - 80,
-    height: 200,
-    borderRadius: 12,
   },
   formSection: {
     marginBottom: 30,
@@ -619,85 +829,406 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
-  processButton: {
+  // Scan Mode Selection
+  scanModeSection: {
+    marginTop: 20,
+  },
+  modeButtonsContainer: {
+    gap: 16,
+  },
+  modeButton: {
     borderRadius: 16,
     overflow: "hidden",
-    marginTop: 10,
   },
-  processButtonGradient: {
-    flexDirection: "row",
+  modeButtonGradient: {
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
   },
-  processButtonIcon: {
-    fontSize: 20,
-    marginRight: 8,
+  modeButtonIcon: {
+    fontSize: 32,
+    marginBottom: 12,
   },
-  processButtonText: {
+  modeButtonTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  modeButtonText: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  // Camera styles
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  darkBar: {
+    backgroundColor: "#000000",
+    flex: 1,
+    justifyContent: "center",
+  },
+  cameraViewContainer: {
+    aspectRatio: 4 / 3,
+    width: "100%",
+    backgroundColor: "#000000",
+    position: "relative",
+  },
+  centeredCamera: {
+    flex: 1,
+    width: "100%",
+  },
+  cameraHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  cameraFooter: {
+    paddingVertical: 40,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  closeButtonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
   },
-  resultContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 20,
-    padding: 24,
-    marginTop: 20,
+  cameraTitleContainer: {
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
-  scoreContainer: {
+  cameraTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  placeholder: {
+    width: 44,
+  },
+  captureButtonContainer: {
+    alignItems: "center",
+  },
+  captureButton: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 4,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+  },
+  captureButtonDisabled: {
+    opacity: 0.6,
+  },
+  captureButtonInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  // Manual Upload styles
+  uploadContainer: {
+    flex: 1,
+  },
+  uploadGradient: {
+    flex: 1,
+    paddingTop: 40,
+  },
+  uploadHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  uploadTitleContainer: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  uploadTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  uploadContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  uploadLoadingContainer: {
+    alignItems: "center",
+  },
+  uploadLoadingText: {
+    color: "white",
+    fontSize: 18,
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  // Brief Results Overlay
+  briefResultsOverlay: {
+    position: "absolute",
+    top: 20,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  briefResultsContainer: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  briefScoreSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  briefScoreBox: {
+    alignItems: "center",
+    marginRight: 20,
+  },
+  briefScoreText: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "white",
+  },
+  briefScoreLabel: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginTop: 4,
+  },
+  briefStatsContainer: {
+    flex: 1,
+  },
+  briefStatsText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+    marginBottom: 4,
+  },
+  briefPercentageText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#48bb78",
+  },
+  briefButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  scanAgainButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  advancedButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  briefButtonGradient: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  briefButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  briefProcessedImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+  },
+  // Camera Guide styles
+  guideContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  instructionContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    alignItems: "center",
+  },
+  instructionBox: {
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    maxWidth: 280,
+  },
+  instructionTitle: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  instructionText: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "left",
+  },
+  toggleGuideButton: {
+    position: "absolute",
+    top: 80,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  toggleGuideText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  // Detailed Results Modal
+  detailedResultsContainer: {
+    flex: 1,
+  },
+  detailedGradient: {
+    flex: 1,
+    paddingTop: 40,
+  },
+  detailedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  backButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  backButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  detailedTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "white",
+  },
+  detailedScrollView: {
+    flex: 1,
+    padding: 20,
+  },
+  detailedScoreContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 24,
   },
-  scoreBox: {
+  detailedScoreBox: {
     padding: 20,
     borderRadius: 16,
     alignItems: "center",
     marginRight: 20,
     minWidth: 80,
   },
-  scoreText: {
+  detailedScoreText: {
     fontSize: 28,
     fontWeight: "bold",
     color: "white",
   },
-  scoreLabel: {
+  detailedScoreLabel: {
     fontSize: 12,
     color: "white",
     marginTop: 4,
   },
-  progressContainer: {
+  detailedProgressContainer: {
     flex: 1,
   },
-  progressText: {
+  detailedProgressText: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
     color: "white",
   },
-  progressBar: {
+  detailedProgressBar: {
     height: 12,
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 6,
     overflow: "hidden",
   },
-  progressFill: {
+  detailedProgressFill: {
     height: "100%",
     borderRadius: 6,
   },
-  processedImage: {
+  detailedImageSection: {
+    marginBottom: 24,
+  },
+  detailedSectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 12,
+  },
+  detailedImageCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  detailedProcessedImage: {
     width: "100%",
     height: 200,
     borderRadius: 12,
+  },
+  detailedTableSection: {
+    marginBottom: 24,
   },
   tableContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 16,
     overflow: "hidden",
-    marginTop: 16,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
@@ -755,80 +1286,5 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "bold",
-  },
-  // Camera styles
-  cameraContainer: {
-    flex: 1,
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    flex: 1,
-  },
-  cameraHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-  closeButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  cameraTitleContainer: {
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-  cameraTitle: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  placeholder: {
-    width: 44,
-  },
-  cameraFooter: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 60,
-  },
-  captureButtonContainer: {
-    alignItems: "center",
-  },
-  captureButton: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 4,
-    borderColor: "rgba(255, 255, 255, 0.5)",
-  },
-  captureButtonInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
   },
 });
