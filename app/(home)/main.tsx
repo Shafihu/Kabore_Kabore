@@ -2,12 +2,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +36,35 @@ interface ExamResult {
   image_type: string;
 }
 
+interface StoredExamResult {
+  id: string;
+  timestamp: number;
+  studentName?: string;
+  examTitle?: string;
+  score: number;
+  correct: number;
+  total: number;
+  percentage: number;
+  grade: string;
+  grading: boolean[];
+  image: string;
+}
+
+interface AnalysisData {
+  totalExams: number;
+  averageScore: number;
+  passRate: number;
+  gradeDistribution: {
+    A: number;
+    B: number;
+    C: number;
+    D: number;
+    E: number;
+    F: number;
+  };
+  recentExams: StoredExamResult[];
+}
+
 interface ImageAsset {
   uri: string;
   width?: number;
@@ -54,10 +84,13 @@ export default function App() {
   const [showCamera, setShowCamera] = useState(false);
   const [showDetailedResults, setShowDetailedResults] = useState(false);
   const [showManualUpload, setShowManualUpload] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [showGuide, setShowGuide] = useState(true);
   const [showSetup, setShowSetup] = useState(true);
   const [scanMode, setScanMode] = useState<"camera" | "upload">("camera");
+  const [storedResults, setStoredResults] = useState<StoredExamResult[]>([]);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -282,6 +315,154 @@ export default function App() {
     setImage(null);
   };
 
+  // Storage and Analysis Functions
+  const calculateGrade = (percentage: number): string => {
+    if (percentage >= 80) return "A";
+    if (percentage >= 70) return "B";
+    if (percentage >= 60) return "C";
+    if (percentage >= 50) return "D";
+    if (percentage >= 40) return "E";
+    return "F";
+  };
+
+  const saveResult = async (examResult: ExamResult) => {
+    try {
+      const percentage = (examResult.score / examResult.total) * 100;
+      const grade = calculateGrade(percentage);
+
+      const storedResult: StoredExamResult = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        score: examResult.score,
+        correct: examResult.correct,
+        total: examResult.total,
+        percentage,
+        grade,
+        grading: examResult.grading,
+        image: examResult.image,
+      };
+
+      const existingResults = await AsyncStorage.getItem("examResults");
+      const results: StoredExamResult[] = existingResults
+        ? JSON.parse(existingResults)
+        : [];
+
+      results.push(storedResult);
+      await AsyncStorage.setItem("examResults", JSON.stringify(results));
+
+      setStoredResults(results);
+    } catch (error) {
+      console.error("Error saving result:", error);
+    }
+  };
+
+  const loadStoredResults = async () => {
+    try {
+      const existingResults = await AsyncStorage.getItem("examResults");
+      if (existingResults) {
+        const results: StoredExamResult[] = JSON.parse(existingResults);
+        setStoredResults(results);
+      }
+    } catch (error) {
+      console.error("Error loading results:", error);
+    }
+  };
+
+  const generateAnalysis = (): AnalysisData => {
+    if (storedResults.length === 0) {
+      return {
+        totalExams: 0,
+        averageScore: 0,
+        passRate: 0,
+        gradeDistribution: {
+          A: 0,
+          B: 0,
+          C: 0,
+          D: 0,
+          E: 0,
+          F: 0,
+        },
+        recentExams: [],
+      };
+    }
+
+    const totalExams = storedResults.length;
+    const averageScore =
+      storedResults.reduce((sum, result) => sum + result.percentage, 0) /
+      totalExams;
+    const passRate =
+      (storedResults.filter((result) => result.percentage >= 40).length /
+        totalExams) *
+      100;
+
+    const gradeDistribution = {
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+      E: 0,
+      F: 0,
+    };
+
+    storedResults.forEach((result) => {
+      gradeDistribution[result.grade as keyof typeof gradeDistribution]++;
+    });
+
+    const recentExams = storedResults
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 10);
+
+    return {
+      totalExams,
+      averageScore,
+      passRate,
+      gradeDistribution,
+      recentExams,
+    };
+  };
+
+  const showAnalysisModal = () => {
+    const analysis = generateAnalysis();
+    setAnalysisData(analysis);
+    setShowAnalysis(true);
+  };
+
+  const clearAllResults = async () => {
+    Alert.alert(
+      "Clear All Results",
+      "Are you sure you want to delete all stored exam results? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem("examResults");
+              setStoredResults([]);
+              setAnalysisData(null);
+              Alert.alert("Success", "All results have been cleared.");
+            } catch (error) {
+              Alert.alert("Error", "Failed to clear results.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Load stored results on component mount
+  useEffect(() => {
+    loadStoredResults();
+  }, []);
+
+  // Save result when new result is available
+  useEffect(() => {
+    if (result) {
+      saveResult(result);
+    }
+  }, [result]);
+
   const renderCameraGuide = () => {
     return (
       <View style={styles.guideContainer}>
@@ -317,52 +498,37 @@ export default function App() {
   const renderBriefResults = () => {
     if (!result) return null;
 
-    const percentage = result.total
-      ? Math.round((result.correct / result.total) * 100)
-      : 0;
+    const percentage = (result.score / result.total) * 100;
+    const grade = calculateGrade(percentage);
 
     return (
       <View style={styles.briefResultsOverlay}>
-        <LinearGradient
-          colors={["rgba(0, 0, 0, 0.8)", "rgba(0, 0, 0, 0.6)"]}
-          style={styles.briefResultsContainer}
-        >
+        <View style={styles.briefResultsContainer}>
           <View style={styles.briefScoreSection}>
             <View style={styles.briefScoreBox}>
               <Text style={styles.briefScoreText}>{result.score}</Text>
               <Text style={styles.briefScoreLabel}>Score</Text>
             </View>
-
             <View style={styles.briefStatsContainer}>
               <Text style={styles.briefStatsText}>
-                {result.correct}/{result.total} Correct
+                {result.correct} of {result.total} correct
               </Text>
-              <Text style={styles.briefPercentageText}>{percentage}%</Text>
+              <Text style={styles.briefPercentageText}>
+                {percentage.toFixed(1)}% • {grade}
+              </Text>
             </View>
-
-            <Image
-              source={{ uri: result.image }}
-              style={styles.briefProcessedImage}
-              resizeMode="contain"
-            />
           </View>
 
           <View style={styles.briefButtonsContainer}>
             <TouchableOpacity
               style={styles.scanAgainButton}
-              onPress={
-                scanMode === "camera"
-                  ? scanAgain
-                  : () => startScanning("upload")
-              }
+              onPress={scanAgain}
             >
               <LinearGradient
                 colors={["#4299e1", "#3182ce"]}
                 style={styles.briefButtonGradient}
               >
-                <Text style={styles.briefButtonText}>
-                  {scanMode === "camera" ? "📷 Scan Again" : "📁 Upload Again"}
-                </Text>
+                <Text style={styles.briefButtonText}>Scan Again</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -374,11 +540,11 @@ export default function App() {
                 colors={["#48bb78", "#38a169"]}
                 style={styles.briefButtonGradient}
               >
-                <Text style={styles.briefButtonText}>📊 Advanced</Text>
+                <Text style={styles.briefButtonText}>View Details</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </LinearGradient>
+        </View>
       </View>
     );
   };
@@ -514,11 +680,7 @@ export default function App() {
                             {studentAnswer}
                           </Text>
                           <View
-                            style={[
-                              styles.tableCellText,
-                              styles.statusColumn,
-                              styles.statusCell,
-                            ]}
+                            style={[styles.statusColumn, styles.statusCell]}
                           >
                             <LinearGradient
                               colors={
@@ -554,70 +716,233 @@ export default function App() {
     );
   };
 
+  const renderAnalysisModal = () => {
+    if (!analysisData) return null;
+
+    return (
+      <Modal visible={showAnalysis} animationType="slide">
+        <View style={styles.analysisContainer}>
+          <LinearGradient
+            colors={["#1a365d", "#2d5a87", "#4299e1"]}
+            style={styles.analysisGradient}
+          >
+            {/* Header */}
+            <View style={styles.analysisHeader}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowAnalysis(false)}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+              <Text style={styles.analysisTitle}>Exam Analysis</Text>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={clearAllResults}
+              >
+                <Text style={styles.clearButtonText}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.analysisScrollView}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Overview Stats */}
+              <View style={styles.overviewSection}>
+                <Text style={styles.sectionTitle}>📊 Overview</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>
+                      {analysisData.totalExams}
+                    </Text>
+                    <Text style={styles.statLabel}>Total Exams</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>
+                      {analysisData.averageScore.toFixed(1)}%
+                    </Text>
+                    <Text style={styles.statLabel}>Average Score</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>
+                      {analysisData.passRate.toFixed(1)}%
+                    </Text>
+                    <Text style={styles.statLabel}>Pass Rate</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Grade Distribution */}
+              <View style={styles.gradeSection}>
+                <Text style={styles.sectionTitle}>📈 Grade Distribution</Text>
+                <View style={styles.gradeContainer}>
+                  {Object.entries(analysisData.gradeDistribution).map(
+                    ([grade, count]) => (
+                      <View key={grade} style={styles.gradeItem}>
+                        <View style={styles.gradeBar}>
+                          <View
+                            style={[
+                              styles.gradeBarFill,
+                              {
+                                width: `${
+                                  analysisData.totalExams > 0
+                                    ? (count / analysisData.totalExams) * 100
+                                    : 0
+                                }%`,
+                                backgroundColor: getGradeColor(grade),
+                              },
+                            ]}
+                          />
+                        </View>
+                        <View style={styles.gradeInfo}>
+                          <Text style={styles.gradeText}>{grade}</Text>
+                          <Text style={styles.gradeCount}>{count}</Text>
+                        </View>
+                      </View>
+                    )
+                  )}
+                </View>
+              </View>
+
+              {/* Recent Exams */}
+              <View style={styles.recentSection}>
+                <Text style={styles.sectionTitle}>🕒 Recent Exams</Text>
+                {analysisData.recentExams.length > 0 ? (
+                  <View style={styles.recentExamsContainer}>
+                    {analysisData.recentExams.map((exam, index) => (
+                      <View key={exam.id} style={styles.recentExamCard}>
+                        <View style={styles.recentExamHeader}>
+                          <Text style={styles.recentExamNumber}>
+                            #{analysisData.totalExams - index}
+                          </Text>
+                          <Text style={styles.recentExamDate}>
+                            {new Date(exam.timestamp).toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <View style={styles.recentExamStats}>
+                          <View style={styles.recentExamStat}>
+                            <Text style={styles.recentExamScore}>
+                              {exam.score}/{exam.total}
+                            </Text>
+                            <Text style={styles.recentExamLabel}>Score</Text>
+                          </View>
+                          <View style={styles.recentExamStat}>
+                            <Text style={styles.recentExamPercentage}>
+                              {exam.percentage.toFixed(1)}%
+                            </Text>
+                            <Text style={styles.recentExamLabel}>
+                              Percentage
+                            </Text>
+                          </View>
+                          <View style={styles.recentExamStat}>
+                            <Text
+                              style={[
+                                styles.recentExamGrade,
+                                { color: getGradeColor(exam.grade) },
+                              ]}
+                            >
+                              {exam.grade}
+                            </Text>
+                            <Text style={styles.recentExamLabel}>Grade</Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>
+                      No exams analyzed yet
+                    </Text>
+                    <Text style={styles.emptyStateSubtext}>
+                      Scan some answer sheets to see analysis
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </LinearGradient>
+        </View>
+      </Modal>
+    );
+  };
+
+  const getGradeColor = (grade: string): string => {
+    switch (grade) {
+      case "A":
+        return "#48bb78";
+      case "B":
+        return "#9ae6b4";
+      case "C":
+        return "#ed8936";
+      case "D":
+        return "#f6e05e";
+      case "E":
+        return "#f6ad55";
+      case "F":
+        return "#c53030";
+      default:
+        return "#718096";
+    }
+  };
+
   const renderCamera = () => {
     return (
       <Modal visible={showCamera} animationType="slide">
         <View style={styles.cameraContainer}>
-          {/* Top dark bar */}
-          <View style={styles.darkBar}>
-            <View style={styles.cameraHeader}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={goBackToSetup}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-              <View style={styles.cameraTitleContainer}>
-                <Text style={styles.cameraTitle}>Camera Scanner</Text>
-              </View>
-              <View style={styles.placeholder} />
+          {/* Top header bar */}
+          <View style={styles.cameraHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={goBackToSetup}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+            <View style={styles.cameraTitleContainer}>
+              <Text style={styles.cameraTitle}>Camera Scanner</Text>
             </View>
+            <View style={styles.placeholder} />
           </View>
 
-          {/* Centered Camera View Container */}
-          <View style={styles.cameraViewContainer}>
-            {/* Camera View - NO CHILDREN */}
+          {/* Camera View Container - Full width and height */}
+          <View style={styles.cameraViewContainerFixed}>
             <CameraView
               ref={cameraRef}
-              style={styles.centeredCamera}
+              style={styles.centeredCameraFixed}
               facing="back"
               ratio="4:3"
               pictureSize="high"
             />
-
             {/* Overlays positioned absolutely on top of camera */}
             {showGuide && !result && renderCameraGuide()}
             {result && renderBriefResults()}
           </View>
 
-          {/* Bottom dark bar */}
-          <View style={styles.darkBar}>
-            <View style={styles.cameraFooter}>
-              <View style={styles.captureButtonContainer}>
-                {!result && (
-                  <TouchableOpacity
-                    style={[
-                      styles.captureButton,
-                      loading && styles.captureButtonDisabled,
-                    ]}
-                    onPress={takePicture}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" size="large" />
-                    ) : (
-                      <LinearGradient
-                        colors={["#ffffff", "#f7fafc"]}
-                        style={styles.captureButtonInner}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+          {/* Bottom footer bar */}
+          <View style={styles.cameraFooter}>
+            <View style={styles.captureButtonContainer}>
+              {!result && (
+                <TouchableOpacity
+                  style={[
+                    styles.captureButton,
+                    loading && styles.captureButtonDisabled,
+                  ]}
+                  onPress={takePicture}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" size="large" />
+                  ) : (
+                    <LinearGradient
+                      colors={["#ffffff", "#f7fafc"]}
+                      style={styles.captureButtonInner}
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
-
         {/* Detailed Results Modal - Outside camera modal */}
         {renderDetailedResults()}
       </Modal>
@@ -750,6 +1075,36 @@ export default function App() {
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {/* Analysis Section */}
+                <View style={styles.analysisSection}>
+                  <Text style={styles.sectionTitle}>
+                    📊 Analysis & Insights
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.analysisButton}
+                    onPress={showAnalysisModal}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={["#ed8936", "#dd6b20"]}
+                      style={styles.analysisButtonGradient}
+                    >
+                      <Text style={styles.analysisButtonIcon}>📈</Text>
+                      <Text style={styles.analysisButtonTitle}>
+                        View Analysis
+                      </Text>
+                      <Text style={styles.analysisButtonText}>
+                        {storedResults.length > 0
+                          ? `${storedResults.length} exam${
+                              storedResults.length > 1 ? "s" : ""
+                            } analyzed`
+                          : "No exams analyzed yet"}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -763,6 +1118,7 @@ export default function App() {
       {showSetup && renderSetup()}
       {renderCamera()}
       {renderManualUpload()}
+      {renderAnalysisModal()}
     </>
   );
 }
@@ -861,6 +1217,35 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+  // Analysis Section
+  analysisSection: {
+    marginTop: 20,
+  },
+  analysisButton: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  analysisButtonGradient: {
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  analysisButtonIcon: {
+    fontSize: 32,
+    marginBottom: 12,
+  },
+  analysisButtonTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  analysisButtonText: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
   // Camera styles
   cameraContainer: {
     flex: 1,
@@ -877,7 +1262,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
     position: "relative",
   },
+  cameraViewContainerFixed: {
+    flex: 1,
+    width: "100%",
+    backgroundColor: "#000000",
+    position: "relative",
+  },
   centeredCamera: {
+    flex: 1,
+    width: "100%",
+  },
+  centeredCameraFixed: {
     flex: 1,
     width: "100%",
   },
@@ -1286,5 +1681,180 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "bold",
+  },
+  // Analysis Modal Styles
+  analysisContainer: {
+    flex: 1,
+  },
+  analysisGradient: {
+    flex: 1,
+    paddingTop: 40,
+  },
+  analysisHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  analysisTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "white",
+  },
+  clearButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  clearButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  analysisScrollView: {
+    flex: 1,
+    padding: 20,
+  },
+  overviewSection: {
+    marginBottom: 24,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 16,
+  },
+  statCard: {
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  gradeSection: {
+    marginBottom: 24,
+  },
+  gradeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  gradeItem: {
+    alignItems: "center",
+    width: "30%", // Adjust for 3 columns
+  },
+  gradeBar: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  gradeBarFill: {
+    height: "100%",
+    borderRadius: 5,
+  },
+  gradeInfo: {
+    alignItems: "center",
+  },
+  gradeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "white",
+  },
+  gradeCount: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  recentSection: {
+    marginBottom: 24,
+  },
+  recentExamsContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  recentExamCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  recentExamHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  recentExamNumber: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "white",
+  },
+  recentExamDate: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  recentExamStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  recentExamStat: {
+    alignItems: "center",
+  },
+  recentExamScore: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "white",
+  },
+  recentExamLabel: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  recentExamPercentage: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#48bb78",
+  },
+  recentExamGrade: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 30,
+  },
+  emptyStateText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 14,
+    textAlign: "center",
   },
 });

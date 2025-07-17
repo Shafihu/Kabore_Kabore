@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DermaScanAI - Mobile Application Design Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 20mm;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: always;
+        }
+
+        .page:last-child {
+            page-break-after: avoid;
+        }
+
+        /* Cover Page */
+        .cover-page {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            height: 100%;
+        }
+
+        .app-logo {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #FF8E6E, #FF6B47);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(255, 142, 110, 0.3);
+        }
+
+        .app-logo svg {
+            width: 60px;
+            height: 60px;
+            fill: white;
+        }
+
+        .cover-title {
+            font-size: 48px;
+            font-weight: 700;
+            color: #FF8E6E;
+            margin-bottom: 10px;
+        }
+
+        .cover-subtitle {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .cover-info {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            border-left: 5px solid #FF8E6E;
+        }
+
+        .cover-info h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .cover-info p {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        /* Headers */
+        h1 {
+            color: #FF8E6E;
+            font-size: 32px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #FF8E6E;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #333;
+            font-size: 24px;
+            margin: 30px 0 15px 0;
+            border-left: 4px solid #FF8E6E;
+            padding-left: 15px;
+        }
+
+        h3 {
+            color: #555;
+            font-size: 20px;
+            margin: 20px 0 10px 0;
+        }
+
+        h4 {
+            color: #666;
+            font-size: 16px;
+            margin: 15px 0 8px 0;
+            font-weight: 600;
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc li {
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .toc a {
+            text-decoration: none;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .toc a:hover {
+            color: #FF8E6E;
+        }
+
+        /* Content Styling */
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Diagrams and Wireframes */
+        .diagram-container {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .wireframe {
+            display: inline-block;
+            width: 200px;
+            height: 400px;
+            background: white;
+            border: 2px solid #333;
+            border-radius: 20px;
+            margin: 10px;
+            padding: 15px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .wireframe-header {
+            height: 40px;
+            background: #FF8E6E;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .wireframe-content {
+            height: calc(100% - 55px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .wireframe-element {
+            background: #f0f0f0;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        .wireframe-button {
+            background: #FF8E6E;
+            color: white;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: bold;
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .arch-layer {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .arch-component {
+            background: white;
+            border: 2px solid #FF8E6E;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .arch-component h4 {
+            color: #FF8E6E;
+            margin-bottom: 5px;
+        }
+
+        .arch-arrow {
+            font-size: 24px;
+            color: #FF8E6E;
+        }
+
+        /* Flow Chart */
+        .flowchart {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .flow-step {
+            background: white;
+            border: 2px solid #FF8E6E;
+            border-radius: 10px;
+            padding: 15px 25px;
+            text-align: center;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .flow-step.decision {
+            border-radius: 50px;
+            background: #fff3f0;
+        }
+
+        .flow-step.process {
+            background: #f0f8ff;
+            border-color: #4CAF50;
+        }
+
+        .flow-arrow {
+            font-size: 20px;
+            color: #FF8E6E;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background: #FF8E6E;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        /* Feature Cards */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background: #FF8E6E;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            color: white;
+            font-size: 24px;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .page {
+                box-shadow: none;
+                margin: 0;
+                padding: 15mm;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page {
+                width: 100%;
+                padding: 15px;
+            }
+            
+            .wireframe {
+                width: 150px;
+                height: 300px;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Cover Page -->
+    <div class="page cover-page">
+        <div class="app-logo">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+        </div>
+        
+        <h1 class="cover-title">DermaScanAI</h1>
+        <p class="cover-subtitle">Mobile Application Design Document</p>
+        
+        <div class="cover-info">
+            <h3>Project Information</h3>
+            <p><strong>Application Type:</strong> React Native Mobile Application</p>
+            <p><strong>Platform:</strong> iOS & Android</p>
+            <p><strong>Domain:</strong> Healthcare Technology / Dermatology</p>
+            <p><strong>Version:</strong> 1.0.0</p>
+            <p><strong>Date:</strong> December 2024</p>
+            <p><strong>Document Type:</strong> Technical Design Specification</p>
+        </div>
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="page">
+        <h1>Table of Contents</h1>
+        <div class="toc">
+            <ul>
+                <li><a href="#executive-summary">1. Executive Summary <span>3</span></a></li>
+                <li><a href="#project-overview">2. Project Overview <span>4</span></a></li>
+                <li><a href="#system-architecture">3. System Architecture <span>5</span></a></li>
+                <li><a href="#user-flow">4. User Flow & Navigation <span>6</span></a></li>
+                <li><a href="#wireframes">5. Wireframes & UI Design <span>7</span></a></li>
+                <li><a href="#technical-specifications">6. Technical Specifications <span>9</span></a></li>
+                <li><a href="#features">7. Feature Specifications <span>10</span></a></li>
+                <li><a href="#data-management">8. Data Management <span>11</span></a></li>
+                <li><a href="#security">9. Security & Privacy <span>12</span></a></li>
+                <li><a href="#testing">10. Testing Strategy <span>13</span></a></li>
+                <li><a href="#deployment">11. Deployment Plan <span>14</span></a></li>
+                <li><a href="#conclusion">12. Conclusion <span>15</span></a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="page">
+        <h1 id="executive-summary">1. Executive Summary</h1>
+        
+        <h2>1.1 Project Vision</h2>
+        <p>DermaScanAI is an innovative React Native mobile application designed to democratize dermatological healthcare through artificial intelligence. The application empowers users to perform preliminary skin condition assessments using their smartphone cameras, providing instant analysis and professional guidance recommendations.</p>
+
+        <h2>1.2 Problem Statement</h2>
+        <p>Access to dermatological care remains limited due to:</p>
+        <ul>
+            <li>Long waiting times for specialist appointments</li>
+            <li>Geographic barriers to healthcare access</li>
+            <li>High costs of dermatological consultations</li>
+            <li>Lack of early detection for skin conditions</li>
+            <li>Limited health literacy regarding skin health</li>
+        </ul>
+
+        <h2>1.3 Solution Overview</h2>
+        <p>DermaScanAI addresses these challenges by providing:</p>
+        <ul>
+            <li><strong>AI-Powered Analysis:</strong> Advanced machine learning algorithms for skin condition detection</li>
+            <li><strong>Instant Results:</strong> Real-time analysis with confidence scoring</li>
+            <li><strong>Professional Network:</strong> Direct connection to certified dermatologists</li>
+            <li><strong>Health Tracking:</strong> Comprehensive scan history and progress monitoring</li>
+            <li><strong>Educational Resources:</strong> Evidence-based skin health information</li>
+        </ul>
+
+        <h2>1.4 Target Audience</h2>
+        <ul>
+            <li><strong>Primary:</strong> Health-conscious individuals aged 25-55</li>
+            <li><strong>Secondary:</strong> Parents monitoring children's skin health</li>
+            <li><strong>Tertiary:</strong> Healthcare professionals seeking diagnostic support tools</li>
+        </ul>
+
+        <h2>1.5 Key Success Metrics</h2>
+        <ul>
+            <li>Diagnostic accuracy rate > 85%</li>
+            <li>User engagement rate > 70%</li>
+            <li>Time to diagnosis < 30 seconds</li>
+            <li>User satisfaction score > 4.5/5</li>
+        </ul>
+    </div>
+
+    <!-- Project Overview -->
+    <div class="page">
+        <h1 id="project-overview">2. Project Overview</h1>
+
+        <h2>2.1 Application Scope</h2>
+        <p>DermaScanAI is a comprehensive mobile health application that combines computer vision, machine learning, and telemedicine to provide accessible dermatological care. The application serves as a bridge between consumer health technology and professional medical services.</p>
+
+        <h2>2.2 Core Functionalities</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📷</div>
+                <h4>AI Skin Analysis</h4>
+                <p>Advanced computer vision algorithms analyze skin images to detect potential conditions with high accuracy.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">👨‍⚕️</div>
+                <h4>Dermatologist Network</h4>
+                <p>Connect with certified dermatologists for professional consultations and second opinions.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h4>Health Tracking</h4>
+                <p>Comprehensive tracking of skin health over time with detailed analytics and insights.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎓</div>
+                <h4>Educational Resources</h4>
+                <p>Evidence-based information and tips for maintaining optimal skin health.</p>
+            </div>
+        </div>
+
+        <h2>2.3 Technology Stack</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Technology</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Frontend Framework</td>
+                    <td>React Native</td>
+                    <td>Cross-platform mobile development</td>
+                </tr>
+                <tr>
+                    <td>Navigation</td>
+                    <td>React Navigation</td>
+                    <td>Screen navigation and routing</td>
+                </tr>
+                <tr>
+                    <td>State Management</td>
+                    <td>Redux Toolkit</td>
+                    <td>Application state management</td>
+                </tr>
+                <tr>
+                    <td>Camera Integration</td>
+                    <td>Expo Camera</td>
+                    <td>Image capture functionality</td>
+                </tr>
+                <tr>
+                    <td>Local Storage</td>
+                    <td>AsyncStorage</td>
+                    <td>Local data persistence</td>
+                </tr>
+                <tr>
+                    <td>AI/ML Integration</td>
+                    <td>TensorFlow Lite</td>
+                    <td>On-device machine learning</td>
+                </tr>
+                <tr>
+                    <td>Backend Services</td>
+                    <td>Node.js + Express</td>
+                    <td>API services and data processing</td>
+                </tr>
+                <tr>
+                    <td>Database</td>
+                    <td>MongoDB</td>
+                    <td>User data and scan history storage</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>2.4 Development Methodology</h2>
+        <p>The project follows Agile development methodology with:</p>
+        <ul>
+            <li>2-week sprint cycles</li>
+            <li>Continuous integration and deployment</li>
+            <li>Test-driven development approach</li>
+            <li>Regular stakeholder feedback sessions</li>
+            <li>Iterative design and development process</li>
+        </ul>
+    </div>
+
+    <!-- System Architecture -->
+    <div class="page">
+        <h1 id="system-architecture">3. System Architecture</h1>
+
+        <h2>3.1 High-Level Architecture</h2>
+        <div class="arch-diagram">
+            <div class="arch-layer">
+                <div class="arch-component">
+                    <h4>Mobile App</h4>
+                    <p>React Native</p>
+                </div>
+            </div>
+            
+            <div class="arch-arrow">↓</div>
+            
+            <div class="arch-layer">
+                <div class="arch-component">
+                    <h4>API Gateway</h4>
+                    <p>Express.js</p>
+                </div>
+                <div class="arch-component">
+                    <h4>Authentication</h4>
+                    <p>JWT + OAuth</p>
+                </div>
+            </div>
+            
+            <div class="arch-arrow">↓</div>
+            
+            <div class="arch-layer">
+                <div class="arch-component">
+                    <h4>AI Service</h4>
+                    <p>TensorFlow</p>
+                </div>
+                <div class="arch-component">
+                    <h4>Image Processing</h4>
+                    <p>OpenCV</p>
+                </div>
+                <div class="arch-component">
+                    <h4>Telemedicine</h4>
+                    <p>WebRTC</p>
+                </div>
+            </div>
+            
+            <div class="arch-arrow">↓</div>
+            
+            <div class="arch-layer">
+                <div class="arch-component">
+                    <h4>Database</h4>
+                    <p>MongoDB</p>
+                </div>
+                <div class="arch-component">
+                    <h4>File Storage</h4>
+                    <p>AWS S3</p>
+                </div>
+                <div class="arch-component">
+                    <h4>Analytics</h4>
+                    <p>Firebase</p>
+                </div>
+            </div>
+        </div>
+
+        <h2>3.2 Component Architecture</h2>
+        
+        <h3>3.2.1 Presentation Layer</h3>
+        <ul>
+            <li><strong>React Native Components:</strong> Reusable UI components</li>
+            <li><strong>Screen Components:</strong> Individual screen implementations</li>
+            <li><strong>Navigation Components:</strong> Routing and navigation logic</li>
+            <li><strong>State Management:</strong> Redux store and reducers</li>
+        </ul>
+
+        <h3>3.2.2 Business Logic Layer</h3>
+        <ul>
+            <li><strong>API Services:</strong> HTTP client and API communication</li>
+            <li><strong>Data Processing:</strong> Image preprocessing and validation</li>
+            <li><strong>Authentication Services:</strong> User authentication and authorization</li>
+            <li><strong>Utility Functions:</strong> Helper functions and utilities</li>
+        </ul>
+
+        <h3>3.2.3 Data Layer</h3>
+        <ul>
+            <li><strong>Local Storage:</strong> AsyncStorage for offline data</li>
+            <li><strong>Cache Management:</strong> Image and data caching</li>
+            <li><strong>Synchronization:</strong> Online/offline data sync</li>
+        </ul>
+
+        <h2>3.3 Security Architecture</h2>
+        <ul>
+            <li><strong>Data Encryption:</strong> AES-256 encryption for sensitive data</li>
+            <li><strong>Secure Communication:</strong> HTTPS/TLS for all API calls</li>
+            <li><strong>Authentication:</strong> JWT tokens with refresh mechanism</li>
+            <li><strong>Biometric Security:</strong> Fingerprint/Face ID integration</li>
+            <li><strong>HIPAA Compliance:</strong> Healthcare data protection standards</li>
+        </ul>
+    </div>
+
+    <!-- User Flow -->
+    <div class="page">
+        <h1 id="user-flow">4. User Flow & Navigation</h1>
+
+        <h2>4.1 Primary User Journey</h2>
+        <div class="flowchart">
+            <div class="flow-step">
+                <strong>App Launch</strong><br>
+                Splash Screen & Authentication
+            </div>
+            <div class="flow-arrow">↓</div>
+            
+            <div class="flow-step">
+                <strong>Home Dashboard</strong><br>
+                Overview & Quick Actions
+            </div>
+            <div class="flow-arrow">↓</div>
+            
+            <div class="flow-step decision">
+                <strong>User Action</strong><br>
+                Scan, History, Tips, or Profile?
+            </div>
+            <div class="flow-arrow">↓</div>
+            
+            <div class="flow-step process">
+                <strong>Skin Scan Process</strong><br>
+                Camera → AI Analysis → Results
+            </div>
+            <div class="flow-arrow">↓</div>
+            
+            <div class="flow-step">
+                <strong>Results & Recommendations</strong><br>
+                Diagnosis, Confidence, Next Steps
+            </div>
+            <div class="flow-arrow">↓</div>
+            
+            <div class="flow-step decision">
+                <strong>Follow-up Action</strong><br>
+                Save, Share, or Consult Doctor?
+            </div>
+        </div>
+
+        <h2>4.2 Navigation Structure</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Screen Category</th>
+                    <th>Screens</th>
+                    <th>Navigation Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authentication</td>
+                    <td>Login, Register, Forgot Password</td>
+                    <td>Stack Navigator</td>
+                </tr>
+                <tr>
+                    <td>Main App</td>
+                    <td>Home, Scan, History, Tips, Profile</td>
+                    <td>Tab Navigator</td>
+                </tr>
+                <tr>
+                    <td>Scan Flow</td>
+                    <td>Camera, Processing, Results</td>
+                    <td>Stack Navigator</td>
+                </tr>
+                <tr>
+                    <td>Consultation</td>
+                    <td>Doctor List, Profile, Booking</td>
+                    <td>Stack Navigator</td>
+                </tr>
+                <tr>
+                    <td>Settings</td>
+                    <td>Profile, Preferences, Privacy</td>
+                    <td>Stack Navigator</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4.3 User Interaction Patterns</h2>
+        
+        <h3>4.3.1 Scan Process Flow</h3>
+        <ol>
+            <li><strong>Preparation:</strong> User guidance and camera setup</li>
+            <li><strong>Capture:</strong> Image capture with quality validation</li>
+            <li><strong>Processing:</strong> AI analysis with progress indication</li>
+            <li><strong>Results:</strong> Diagnosis presentation with explanations</li>
+            <li><strong>Actions:</strong> Save, share, or seek professional help</li>
+        </ol>
+
+        <h3>4.3.2 Consultation Booking Flow</h3>
+        <ol>
+            <li><strong>Browse:</strong> View available dermatologists</li>
+            <li><strong>Filter:</strong> Search by specialty, location, availability</li>
+            <li><strong>Select:</strong> Choose doctor and consultation type</li>
+            <li><strong>Schedule:</strong> Pick date and time slot</li>
+            <li><strong>Confirm:</strong> Payment and booking confirmation</li>
+        </ol>
+    </div>
+
+    <!-- Wireframes -->
+    <div class="page">
+        <h1 id="wireframes">5. Wireframes & UI Design</h1>
+
+        <h2>5.1 Key Screen Wireframes</h2>
+        
+        <div class="diagram-container">
+            <h3>Main Application Screens</h3>
+            
+            <div class="wireframe">
+                <div class="wireframe-header">Home Dashboard</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Welcome Message</div>
+                    <div class="wireframe-element">Health Score Widget</div>
+                    <div class="wireframe-element">Recent Scans</div>
+                    <div class="wireframe-element">Quick Actions</div>
+                    <div class="wireframe-button">Scan Skin</div>
+                    <div class="wireframe-element">Daily Tip</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">Scan Camera</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Camera Viewfinder</div>
+                    <div class="wireframe-element">Scan Guidelines</div>
+                    <div class="wireframe-element">Focus Area</div>
+                    <div class="wireframe-button">Capture</div>
+                    <div class="wireframe-element">Flash Toggle</div>
+                    <div class="wireframe-element">Camera Switch</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">Scan Results</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Captured Image</div>
+                    <div class="wireframe-element">Diagnosis</div>
+                    <div class="wireframe-element">Confidence Score</div>
+                    <div class="wireframe-element">Recommendations</div>
+                    <div class="wireframe-button">Consult Doctor</div>
+                    <div class="wireframe-element">Save to History</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">History</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Search & Filter</div>
+                    <div class="wireframe-element">Scan Entry 1</div>
+                    <div class="wireframe-element">Scan Entry 2</div>
+                    <div class="wireframe-element">Scan Entry 3</div>
+                    <div class="wireframe-element">Load More</div>
+                    <div class="wireframe-element">Export Data</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>5.2 Design System</h2>
+        
+        <h3>5.2.1 Color Palette</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Color</th>
+                    <th>Hex Code</th>
+                    <th>Usage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Primary Coral</td>
+                    <td>#FF8E6E</td>
+                    <td>Primary actions, branding</td>
+                </tr>
+                <tr>
+                    <td>Secondary Blue</td>
+                    <td>#4A90E2</td>
+                    <td>Information, links</td>
+                </tr>
+                <tr>
+                    <td>Success Green</td>
+                    <td>#4CAF50</td>
+                    <td>Success states, positive feedback</td>
+                </tr>
+                <tr>
+                    <td>Warning Orange</td>
+                    <td>#FFC107</td>
+                    <td>Warnings, moderate conditions</td>
+                </tr>
+                <tr>
+                    <td>Error Red</td>
+                    <td>#F44336</td>
+                    <td>Errors, severe conditions</td>
+                </tr>
+                <tr>
+                    <td>Neutral Gray</td>
+                    <td>#666666</td>
+                    <td>Text, secondary elements</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>5.2.2 Typography</h3>
+        <ul>
+            <li><strong>Primary Font:</strong> SF Pro Display (iOS) / Roboto (Android)</li>
+            <li><strong>Heading Sizes:</strong> 32px, 24px, 20px, 18px</li>
+            <li><strong>Body Text:</strong> 16px regular, 14px secondary</li>
+            <li><strong>Caption Text:</strong> 12px for labels and metadata</li>
+        </ul>
+
+        <h3>5.2.3 Component Library</h3>
+        <ul>
+            <li><strong>Buttons:</strong> Primary, secondary, text, icon buttons</li>
+            <li><strong>Cards:</strong> Information cards, scan result cards</li>
+            <li><strong>Forms:</strong> Input fields, dropdowns, toggles</li>
+            <li><strong>Navigation:</strong> Tab bar, header, breadcrumbs</li>
+            <li><strong>Feedback:</strong> Loading states, progress bars, alerts</li>
+        </ul>
+    </div>
+
+    <!-- Wireframes Continued -->
+    <div class="page">
+        <h2>5.3 Additional Screen Wireframes</h2>
+        
+        <div class="diagram-container">
+            <h3>Secondary Application Screens</h3>
+            
+            <div class="wireframe">
+                <div class="wireframe-header">Doctor List</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Search Bar</div>
+                    <div class="wireframe-element">Filter Options</div>
+                    <div class="wireframe-element">Doctor Card 1</div>
+                    <div class="wireframe-element">Doctor Card 2</div>
+                    <div class="wireframe-element">Doctor Card 3</div>
+                    <div class="wireframe-element">Load More</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">Doctor Profile</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Doctor Photo</div>
+                    <div class="wireframe-element">Name & Specialty</div>
+                    <div class="wireframe-element">Rating & Reviews</div>
+                    <div class="wireframe-element">About Section</div>
+                    <div class="wireframe-button">Book Consultation</div>
+                    <div class="wireframe-element">Available Times</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">Health Tips</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Search & Categories</div>
+                    <div class="wireframe-element">Featured Tip</div>
+                    <div class="wireframe-element">Tip Card 1</div>
+                    <div class="wireframe-element">Tip Card 2</div>
+                    <div class="wireframe-element">Tip Card 3</div>
+                    <div class="wireframe-element">Load More</div>
+                </div>
+            </div>
+
+            <div class="wireframe">
+                <div class="wireframe-header">User Profile</div>
+                <div class="wireframe-content">
+                    <div class="wireframe-element">Profile Photo</div>
+                    <div class="wireframe-element">Personal Info</div>
+                    <div class="wireframe-element">Medical History</div>
+                    <div class="wireframe-element">App Settings</div>
+                    <div class="wireframe-element">Privacy Settings</div>
+                    <div class="wireframe-button">Sign Out</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>5.4 Responsive Design Considerations</h2>
+        
+        <h3>5.4.1 Screen Size Adaptations</h3>
+        <ul>
+            <li><strong>Small Screens (< 5"):</strong> Single column layouts, larger touch targets</li>
+            <li><strong>Medium Screens (5-6"):</strong> Optimized spacing, standard components</li>
+            <li><strong>Large Screens (> 6"):</strong> Multi-column layouts where appropriate</li>
+            <li><strong>Tablets:</strong> Adaptive layouts with sidebar navigation</li>
+        </ul>
+
+        <h3>5.4.2 Accessibility Features</h3>
+        <ul>
+            <li><strong>Voice Over Support:</strong> Screen reader compatibility</li>
+            <li><strong>High Contrast Mode:</strong> Enhanced visibility options</li>
+            <li><strong>Large Text Support:</strong> Dynamic type scaling</li>
+            <li><strong>Touch Accessibility:</strong> Minimum 44px touch targets</li>
+            <li><strong>Color Blind Support:</strong> Non-color dependent information</li>
+        </ul>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="page">
+        <h1 id="technical-specifications">6. Technical Specifications</h1>
+
+        <h2>6.1 Development Environment</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Specification</th>
+                    <th>Version</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>React Native</td>
+                    <td>Cross-platform framework</td>
+                    <td>0.72.x</td>
+                </tr>
+                <tr>
+                    <td>Node.js</td>
+                    <td>JavaScript runtime</td>
+                    <td>18.x LTS</td>
+                </tr>
+                <tr>
+                    <td>Expo SDK</td>
+                    <td>Development platform</td>
+                    <td>49.x</td>
+                </tr>
+                <tr>
+                    <td>TypeScript</td>
+                    <td>Type-safe JavaScript</td>
+                    <td>5.x</td>
+                </tr>
+                <tr>
+                    <td>Metro Bundler</td>
+                    <td>JavaScript bundler</td>
+                    <td>Latest</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6.2 Performance Requirements</h2>
+        
+        <h3>6.2.1 Application Performance</h3>
+        <ul>
+            <li><strong>App Launch Time:</strong> < 3 seconds cold start</li>
+            <li><strong>Screen Transition:</strong> < 300ms between screens</li>
+            <li><strong>Image Processing:</strong> < 30 seconds for AI analysis</li>
+            <li><strong>Memory Usage:</strong> < 150MB average consumption</li>
+            <li><strong>Battery Impact:</strong> Minimal background processing</li>
+        </ul>
+
+        <h3>6.2.2 Network Performance</h3>
+        <ul>
+            <li><strong>API Response Time:</strong> < 2 seconds average</li>
+            <li><strong>Image Upload:</strong> < 10 seconds for 5MB images</li>
+            <li><strong>Offline Capability:</strong> Core features available offline</li>
+            <li><strong>Data Compression:</strong> Optimized image and data transfer</li>
+        </ul>
+
+        <h2>6.3 Device Compatibility</h2>
+        
+        <h3>6.3.1 iOS Requirements</h3>
+        <ul>
+            <li><strong>Minimum Version:</strong> iOS 12.0</li>
+            <li><strong>Supported Devices:</strong> iPhone 7 and newer</li>
+            <li><strong>Camera Requirements:</strong> 8MP rear camera minimum</li>
+            <li><strong>Storage:</strong> 100MB available space</li>
+        </ul>
+
+        <h3>6.3.2 Android Requirements</h3>
+        <ul>
+            <li><strong>Minimum Version:</strong> Android 8.0 (API 26)</li>
+            <li><strong>Target Version:</strong> Android 13 (API 33)</li>
+            <li><strong>RAM:</strong> 3GB minimum, 4GB recommended</li>
+            <li><strong>Camera:</strong> Camera2 API support</li>
+        </ul>
+
+        <h2>6.4 Third-Party Integrations</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Purpose</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Firebase</td>
+                    <td>Analytics, Crashlytics</td>
+                    <td>SDK Integration</td>
+                </tr>
+                <tr>
+                    <td>AWS S3</td>
+                    <td>Image storage</td>
+                    <td>REST API</td>
+                </tr>
+                <tr>
+                    <td>Stripe</td>
+                    <td>Payment processing</td>
+                    <td>SDK Integration</td>
+                </tr>
+                <tr>
+                    <td>Twilio</td>
+                    <td>Video consultations</td>
+                    <td>WebRTC SDK</td>
+                </tr>
+                <tr>
+                    <td>SendGrid</td>
+                    <td>Email notifications</td>
+                    <td>REST API</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Features -->
+    <div class="page">
+        <h1 id="features">7. Feature Specifications</h1>
+
+        <h2>7.1 Core Features</h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h4>AI Skin Analysis</h4>
+                <p><strong>Description:</strong> Advanced computer vision analysis of skin conditions</p>
+                <p><strong>Accuracy:</strong> 85%+ diagnostic accuracy</p>
+                <p><strong>Conditions:</strong> 15+ common skin conditions</p>
+                <p><strong>Processing Time:</strong> < 30 seconds</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h4>Smart Camera</h4>
+                <p><strong>Features:</strong> Auto-focus, flash control, image quality validation</p>
+                <p><strong>Guidance:</strong> Real-time capture guidance</p>
+                <p><strong>Quality Check:</strong> Automatic blur and lighting detection</p>
+                <p><strong>Formats:</strong> JPEG, PNG support</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h4>Health Dashboard</h4>
+                <p><strong>Metrics:</strong> Skin health score, trends analysis</p>
+                <p><strong>History:</strong> Complete scan history with timeline</p>
+                <p><strong>Progress:</strong> Condition improvement tracking</p>
+                <p><strong>Insights:</strong> Personalized health insights</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">👨‍⚕️</div>
+                <h4>Telemedicine</h4>
+                <p><strong>Consultations:</strong> Video, audio, and text consultations</p>
+                <p><strong>Scheduling:</strong> Real-time availability booking</p>
+                <p><strong>Specialists:</strong> Certified dermatologists network</p>
+                <p><strong>Records:</strong> Integrated medical records</p>
+            </div>
+        </div>
+
+        <h2>7.2 Advanced Features</h2>
+        
+        <h3>7.2.1 Machine Learning Capabilities</h3>
+        <ul>
+            <li><strong>Continuous Learning:</strong> Model improvement with user feedback</li>
+            <li><strong>Personalization:</strong> User-specific analysis adaptation</li>
+            <li><strong>Multi-condition Detection:</strong> Simultaneous condition identification</li>
+            <li><strong>Severity Assessment:</strong> Condition severity grading</li>
+        </ul>
+
+        <h3>7.2.2 Data Analytics</h3>
+        <ul>
+            <li><strong>Trend Analysis:</strong> Long-term skin health trends</li>
+            <li><strong>Risk Assessment:</strong> Predictive health risk analysis</li>
+            <li><strong>Comparative Analysis:</strong> Population health comparisons</li>
+            <li><strong>Outcome Tracking:</strong> Treatment effectiveness monitoring</li>
+        </ul>
+
+        <h2>7.3 User Experience Features</h2>
+        
+        <h3>7.3.1 Personalization</h3>
+        <ul>
+            <li><strong>Custom Profiles:</strong> Individual health profiles</li>
+            <li><strong>Preferences:</strong> Personalized app settings</li>
+            <li><strong>Notifications:</strong> Smart health reminders</li>
+            <li><strong>Recommendations:</strong> Tailored health advice</li>
+        </ul>
+
+        <h3>7.3.2 Social Features</h3>
+        <ul>
+            <li><strong>Family Accounts:</strong> Multiple user profiles</li>
+            <li><strong>Sharing:</strong> Secure result sharing with healthcare providers</li>
+            <li><strong>Community:</strong> Anonymous health discussions</li>
+            <li><strong>Support Groups:</strong> Condition-specific support communities</li>
+        </ul>
+
+        <h2>7.4 Premium Features</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Free Tier</th>
+                    <th>Premium Tier</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Monthly Scans</td>
+                    <td>5 scans</td>
+                    <td>Unlimited</td>
+                </tr>
+                <tr>
+                    <td>History Storage</td>
+                    <td>3 months</td>
+                    <td>Unlimited</td>
+                </tr>
+                <tr>
+                    <td>Doctor Consultations</td>
+                    <td>Text only</td>
+                    <td>Video + Audio</td>
+                </tr>
+                <tr>
+                    <td>Advanced Analytics</td>
+                    <td>Basic reports</td>
+                    <td>Detailed insights</td>
+                </tr>
+                <tr>
+                    <td>Priority Support</td>
+                    <td>Standard</td>
+                    <td>24/7 Priority</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Data Management -->
+    <div class="page">
+        <h1 id="data-management">8. Data Management</h1>
+
+        <h2>8.1 Data Architecture</h2>
+        
+        <h3>8.1.1 Data Types</h3>
+        <ul>
+            <li><strong>User Data:</strong> Personal information, preferences, settings</li>
+            <li><strong>Medical Data:</strong> Scan results, diagnoses, medical history</li>
+            <li><strong>Image Data:</strong> Captured skin images, processed images</li>
+            <li><strong>Analytics Data:</strong> Usage patterns, performance metrics</li>
+            <li><strong>Communication Data:</strong> Consultation records, messages</li>
+        </ul>
+
+        <h3>8.1.2 Data Storage Strategy</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Storage Location</th>
+                    <th>Retention Period</th>
+                    <th>Backup Strategy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>User Profiles</td>
+                    <td>MongoDB Atlas</td>
+                    <td>Account lifetime</td>
+                    <td>Daily automated</td>
+                </tr>
+                <tr>
+                    <td>Scan Images</td>
+                    <td>AWS S3</td>
+                    <td>7 years</td>
+                    <td>Cross-region replication</td>
+                </tr>
+                <tr>
+                    <td>Medical Records</td>
+                    <td>Encrypted database</td>
+                    <td>7 years</td>
+                    <td>HIPAA-compliant backup</td>
+                </tr>
+                <tr>
+                    <td>App Cache</td>
+                    <td>Device storage</td>
+                    <td>30 days</td>
+                    <td>Local only</td>
+                </tr>
+                <tr>
+                    <td>Analytics</td>
+                    <td>Firebase</td>
+                    <td>2 years</td>
+                    <td>Google managed</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>8.2 Data Privacy & Compliance</h2>
+        
+        <h3>8.2.1 Regulatory Compliance</h3>
+        <ul>
+            <li><strong>HIPAA:</strong> Health Insurance Portability and Accountability Act</li>
+            <li><strong>GDPR:</strong> General Data Protection Regulation</li>
+            <li><strong>CCPA:</strong> California Consumer Privacy Act</li>
+            <li><strong>FDA Guidelines:</strong> Medical device software guidelines</li>
+        </ul>
+
+        <h3>8.2.2 Data Protection Measures</h3>
+        <ul>
+            <li><strong>Encryption at Rest:</strong> AES-256 encryption for stored data</li>
+            <li><strong>Encryption in Transit:</strong> TLS 1.3 for data transmission</li>
+            <li><strong>Access Controls:</strong> Role-based access control (RBAC)</li>
+            <li><strong>Audit Logging:</strong> Comprehensive access and modification logs</li>
+            <li><strong>Data Anonymization:</strong> Personal identifier removal for analytics</li>
+        </ul>
+
+        <h2>8.3 Data Synchronization</h2>
+        
+        <h3>8.3.1 Online/Offline Sync</h3>
+        <ul>
+            <li><strong>Offline Storage:</strong> Local SQLite database for offline access</li>
+            <li><strong>Sync Strategy:</strong> Incremental synchronization on connectivity</li>
+            <li><strong>Conflict Resolution:</strong> Last-write-wins with user confirmation</li>
+            <li><strong>Data Validation:</strong> Client and server-side validation</li>
+        </ul>
+
+        <h3>8.3.2 Multi-device Synchronization</h3>
+        <ul>
+            <li><strong>Account Linking:</strong> Single account across multiple devices</li>
+            <li><strong>Real-time Sync:</strong> WebSocket-based real-time updates</li>
+            <li><strong>Device Management:</strong> Device registration and deregistration</li>
+            <li><strong>Selective Sync:</strong> User-controlled data synchronization</li>
+        </ul>
+
+        <h2>8.4 Data Analytics & Insights</h2>
+        
+        <h3>8.4.1 User Analytics</h3>
+        <ul>
+            <li><strong>Usage Patterns:</strong> Feature usage and user behavior</li>
+            <li><strong>Performance Metrics:</strong> App performance and error tracking</li>
+            <li><strong>Health Outcomes:</strong> Treatment effectiveness analysis</li>
+            <li><strong>User Satisfaction:</strong> Feedback and rating analysis</li>
+        </ul>
+
+        <h3>8.4.2 Medical Analytics</h3>
+        <ul>
+            <li><strong>Diagnostic Accuracy:</strong> AI model performance tracking</li>
+            <li><strong>Condition Prevalence:</strong> Population health insights</li>
+            <li><strong>Treatment Outcomes:</strong> Long-term health outcome analysis</li>
+            <li><strong>Risk Factors:</strong> Predictive health risk modeling</li>
+        </ul>
+    </div>
+
+    <!-- Security -->
+    <div class="page">
+        <h1 id="security">9. Security & Privacy</h1>
+
+        <h2>9.1 Security Framework</h2>
+        
+        <h3>9.1.1 Authentication & Authorization</h3>
+        <ul>
+            <li><strong>Multi-factor Authentication:</strong> SMS, email, and biometric options</li>
+            <li><strong>OAuth 2.0:</strong> Secure third-party authentication</li>
+            <li><strong>JWT Tokens:</strong> Stateless authentication with refresh tokens</li>
+            <li><strong>Session Management:</strong> Secure session handling and timeout</li>
+            <li><strong>Role-based Access:</strong> Granular permission system</li>
+        </ul>
+
+        <h3>9.1.2 Data Security</h3>
+        <ul>
+            <li><strong>End-to-end Encryption:</strong> Client-side encryption before transmission</li>
+            <li><strong>Key Management:</strong> AWS KMS for encryption key management</li>
+            <li><strong>Secure Storage:</strong> Encrypted local storage on device</li>
+            <li><strong>Data Masking:</strong> Sensitive data masking in logs and analytics</li>
+        </ul>
+
+        <h2>9.2 Privacy Protection</h2>
+        
+        <h3>9.2.1 Data Minimization</h3>
+        <ul>
+            <li><strong>Purpose Limitation:</strong> Data collection limited to stated purposes</li>
+            <li><strong>Retention Policies:</strong> Automatic data deletion after retention period</li>
+            <li><strong>Consent Management:</strong> Granular consent for different data types</li>
+            <li><strong>Right to Deletion:</strong> User-initiated data deletion capabilities</li>
+        </ul>
+
+        <h3>9.2.2 Transparency Measures</h3>
+        <ul>
+            <li><strong>Privacy Dashboard:</strong> User visibility into data collection and usage</li>
+            <li><strong>Data Export:</strong> User ability to export personal data</li>
+            <li><strong>Audit Trail:</strong> Transparent logging of data access and modifications</li>
+            <li><strong>Privacy Notices:</strong> Clear, understandable privacy communications</li>
+        </ul>
+
+        <h2>9.3 Security Testing</h2>
+        
+        <h3>9.3.1 Vulnerability Assessment</h3>
+        <ul>
+            <li><strong>Penetration Testing:</strong> Regular third-party security assessments</li>
+            <li><strong>Code Analysis:</strong> Static and dynamic code analysis</li>
+            <li><strong>Dependency Scanning:</strong> Third-party library vulnerability scanning</li>
+            <li><strong>Infrastructure Security:</strong> Cloud infrastructure security assessment</li>
+        </ul>
+
+        <h3>9.3.2 Incident Response</h3>
+        <ul>
+            <li><strong>Incident Detection:</strong> Automated security monitoring and alerting</li>
+            <li><strong>Response Plan:</strong> Documented incident response procedures</li>
+            <li><strong>Breach Notification:</strong> Regulatory and user breach notification process</li>
+            <li><strong>Recovery Procedures:</strong> Business continuity and disaster recovery plans</li>
+        </ul>
+
+        <h2>9.4 Compliance Monitoring</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Compliance Area</th>
+                    <th>Requirements</th>
+                    <th>Monitoring Method</th>
+                    <th>Frequency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>HIPAA</td>
+                    <td>PHI protection, access controls</td>
+                    <td>Automated compliance scanning</td>
+                    <td>Continuous</td>
+                </tr>
+                <tr>
+                    <td>GDPR</td>
+                    <td>Consent, data rights, breach notification</td>
+                    <td>Privacy impact assessments</td>
+                    <td>Quarterly</td>
+                </tr>
+                <tr>
+                    <td>FDA</td>
+                    <td>Medical device software requirements</td>
+                    <td>Quality management system</td>
+                    <td>Annual audit</td>
+                </tr>
+                <tr>
+                    <td>SOC 2</td>
+                    <td>Security, availability, confidentiality</td>
+                    <td>Third-party audit</td>
+                    <td>Annual</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Testing -->
+    <div class="page">
+        <h1 id="testing">10. Testing Strategy</h1>
+
+        <h2>10.1 Testing Methodology</h2>
+        
+        <h3>10.1.1 Testing Pyramid</h3>
+        <ul>
+            <li><strong>Unit Tests (70%):</strong> Individual component and function testing</li>
+            <li><strong>Integration Tests (20%):</strong> Component interaction testing</li>
+            <li><strong>End-to-End Tests (10%):</strong> Complete user journey testing</li>
+        </ul>
+
+        <h3>10.1.2 Testing Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Test Type</th>
+                    <th>Purpose</th>
+                    <th>Tools</th>
+                    <th>Coverage Target</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Unit Testing</td>
+                    <td>Component functionality</td>
+                    <td>Jest, React Native Testing Library</td>
+                    <td>90%</td>
+                </tr>
+                <tr>
+                    <td>Integration Testing</td>
+                    <td>API and service integration</td>
+                    <td>Detox, Appium</td>
+                    <td>80%</td>
+                </tr>
+                <tr>
+                    <td>UI Testing</td>
+                    <td>User interface validation</td>
+                    <td>Storybook, Chromatic</td>
+                    <td>100% components</td>
+                </tr>
+                <tr>
+                    <td>Performance Testing</td>
+                    <td>App performance validation</td>
+                    <td>Flipper, React DevTools</td>
+                    <td>Key user flows</td>
+                </tr>
+                <tr>
+                    <td>Security Testing</td>
+                    <td>Security vulnerability assessment</td>
+                    <td>OWASP ZAP, Snyk</td>
+                    <td>All endpoints</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>10.2 AI Model Testing</h2>
+        
+        <h3>10.2.1 Model Validation</h3>
+        <ul>
+            <li><strong>Accuracy Testing:</strong> Diagnostic accuracy validation against expert dermatologists</li>
+            <li><strong>Bias Testing:</strong> Fairness testing across different demographics</li>
+            <li><strong>Edge Case Testing:</strong> Performance with unusual or challenging images</li>
+            <li><strong>Regression Testing:</strong> Model performance consistency over time</li>
+        </ul>
+
+        <h3>10.2.2 Clinical Validation</h3>
+        <ul>
+            <li><strong>Clinical Trials:</strong> Controlled studies with medical professionals</li>
+            <li><strong>Real-world Evidence:</strong> Performance monitoring in production</li>
+            <li><strong>Expert Review:</strong> Dermatologist validation of AI recommendations</li>
+            <li><strong>Outcome Tracking:</strong> Long-term patient outcome analysis</li>
+        </ul>
+
+        <h2>10.3 Device Testing</h2>
+        
+        <h3>10.3.1 Device Compatibility</h3>
+        <ul>
+            <li><strong>iOS Devices:</strong> iPhone 7 through iPhone 15 series</li>
+            <li><strong>Android Devices:</strong> Samsung Galaxy, Google Pixel, OnePlus</li>
+            <li><strong>Screen Sizes:</strong> 4.7" to 6.7" screen sizes</li>
+            <li><strong>OS Versions:</strong> iOS 12+ and Android 8+</li>
+        </ul>
+
+        <h3>10.3.2 Camera Testing</h3>
+        <ul>
+            <li><strong>Image Quality:</strong> Various lighting conditions and camera qualities</li>
+            <li><strong>Focus Accuracy:</strong> Auto-focus performance testing</li>
+            <li><strong>Flash Performance:</strong> Flash effectiveness in different scenarios</li>
+            <li><strong>Stability Testing:</strong> Image capture stability and consistency</li>
+        </ul>
+
+        <h2>10.4 User Acceptance Testing</h2>
+        
+        <h3>10.4.1 Beta Testing Program</h3>
+        <ul>
+            <li><strong>Closed Beta:</strong> 100 healthcare professionals and early adopters</li>
+            <li><strong>Open Beta:</strong> 1,000 general users across target demographics</li>
+            <li><strong>Feedback Collection:</strong> In-app feedback tools and surveys</li>
+            <li><strong>Iterative Improvement:</strong> Regular updates based on user feedback</li>
+        </ul>
+
+        <h3>10.4.2 Usability Testing</h3>
+        <ul>
+            <li><strong>Task Completion:</strong> Core user journey completion rates</li>
+            <li><strong>Time to Complete:</strong> Task completion time measurement</li>
+            <li><strong>Error Rates:</strong> User error frequency and recovery</li>
+            <li><strong>Satisfaction Scores:</strong> User satisfaction and Net Promoter Score</li>
+        </ul>
+    </div>
+
+    <!-- Deployment -->
+    <div class="page">
+        <h1 id="deployment">11. Deployment Plan</h1>
+
+        <h2>11.1 Release Strategy</h2>
+        
+        <h3>11.1.1 Phased Rollout</h3>
+        <ul>
+            <li><strong>Phase 1 - Alpha (Internal):</strong> Internal team testing and validation</li>
+            <li><strong>Phase 2 - Beta (Limited):</strong> Closed beta with healthcare professionals</li>
+            <li><strong>Phase 3 - Beta (Public):</strong> Open beta with general users</li>
+            <li><strong>Phase 4 - Production:</strong> Full public release</li>
+        </ul>
+
+        <h3>11.1.2 Geographic Rollout</h3>
+        <ol>
+            <li><strong>United States:</strong> Initial launch market with FDA compliance</li>
+            <li><strong>Canada:</strong> Second market with Health Canada approval</li>
+            <li><strong>European Union:</strong> GDPR-compliant release</li>
+            <li><strong>Asia-Pacific:</strong> Localized versions for key markets</li>
+        </ol>
+
+        <h2>11.2 App Store Deployment</h2>
+        
+        <h3>11.2.1 iOS App Store</h3>
+        <ul>
+            <li><strong>Developer Account:</strong> Apple Developer Program enrollment</li>
+            <li><strong>App Review:</strong> Apple's app review process compliance</li>
+            <li><strong>Medical App Guidelines:</strong> Health app specific requirements</li>
+            <li><strong>Privacy Labels:</strong> App Store privacy nutrition labels</li>
+        </ul>
+
+        <h3>11.2.2 Google Play Store</h3>
+        <ul>
+            <li><strong>Developer Console:</strong> Google Play Console setup</li>
+            <li><strong>Medical App Policy:</strong> Google Play medical app policies</li>
+            <li><strong>Data Safety:</strong> Play Store data safety declarations</li>
+            <li><strong>Target API Level:</strong> Latest Android API compliance</li>
+        </ul>
+
+        <h2>11.3 Infrastructure Deployment</h2>
+        
+        <h3>11.3.1 Cloud Infrastructure</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Service</th>
+                    <th>Configuration</th>
+                    <th>Scaling</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>API Gateway</td>
+                    <td>AWS API Gateway</td>
+                    <td>Multi-region deployment</td>
+                    <td>Auto-scaling</td>
+                </tr>
+                <tr>
+                    <td>Application Server</td>
+                    <td>AWS ECS Fargate</td>
+                    <td>Container orchestration</td>
+                    <td>Horizontal scaling</td>
+                </tr>
+                <tr>
+                    <td>Database</td>
+                    <td>MongoDB Atlas</td>
+                    <td>Replica set cluster</td>
+                    <td>Auto-scaling storage</td>
+                </tr>
+                <tr>
+                    <td>File Storage</td>
+                    <td>AWS S3</td>
+                    <td>Cross-region replication</td>
+                    <td>Unlimited capacity</td>
+                </tr>
+                <tr>
+                    <td>CDN</td>
+                    <td>AWS CloudFront</td>
+                    <td>Global edge locations</td>
+                    <td>Dynamic scaling</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>11.3.2 Monitoring & Observability</h3>
+        <ul>
+            <li><strong>Application Monitoring:</strong> New Relic for performance monitoring</li>
+            <li><strong>Error Tracking:</strong> Sentry for error monitoring and alerting</li>
+            <li><strong>Log Management:</strong> AWS CloudWatch for centralized logging</li>
+            <li><strong>Uptime Monitoring:</strong> Pingdom for service availability monitoring</li>
+        </ul>
+
+        <h2>11.4 Regulatory Approval</h2>
+        
+        <h3>11.4.1 FDA Submission</h3>
+        <ul>
+            <li><strong>Pre-Submission:</strong> FDA Q-Sub meeting for guidance</li>
+            <li><strong>510(k) Pathway:</strong> Medical device premarket notification</li>
+            <li><strong>Clinical Data:</strong> Clinical validation study results</li>
+            <li><strong>Quality System:</strong> ISO 13485 quality management system</li>
+        </ul>
+
+        <h3>11.4.2 International Approvals</h3>
+        <ul>
+            <li><strong>CE Marking:</strong> European Conformity marking for EU market</li>
+            <li><strong>Health Canada:</strong> Medical device license application</li>
+            <li><strong>TGA Australia:</strong> Therapeutic Goods Administration approval</li>
+            <li><strong>PMDA Japan:</strong> Pharmaceuticals and Medical Devices Agency</li>
+        </ul>
+
+        <h2>11.5 Launch Timeline</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Milestone</th>
+                    <th>Timeline</th>
+                    <th>Dependencies</th>
+                    <th>Success Criteria</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Alpha Release</td>
+                    <td>Month 1</td>
+                    <td>Core features complete</td>
+                    <td>Internal testing passed</td>
+                </tr>
+                <tr>
+                    <td>Closed Beta</td>
+                    <td>Month 2</td>
+                    <td>Security audit complete</td>
+                    <td>100 beta users onboarded</td>
+                </tr>
+                <tr>
+                    <td>Open Beta</td>
+                    <td>Month 3</td>
+                    <td>Performance optimization</td>
+                    <td>1,000 beta users active</td>
+                </tr>
+                <tr>
+                    <td>Production Release</td>
+                    <td>Month 4</td>
+                    <td>Regulatory approvals</td>
+                    <td>App store approval</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Conclusion -->
+    <div class="page">
+        <h1 id="conclusion">12. Conclusion</h1>
+
+        <h2>12.1 Project Summary</h2>
+        <p>DermaScanAI represents a significant advancement in mobile health technology, combining artificial intelligence, computer vision, and telemedicine to democratize access to dermatological care. The application addresses critical gaps in healthcare accessibility while maintaining the highest standards of medical accuracy and data security.</p>
+
+        <h2>12.2 Technical Innovation</h2>
+        <p>The application leverages cutting-edge technologies including:</p>
+        <ul>
+            <li><strong>Advanced AI Models:</strong> State-of-the-art computer vision algorithms for skin condition detection</li>
+            <li><strong>Cross-platform Development:</strong> React Native for efficient iOS and Android deployment</li>
+            <li><strong>Cloud-native Architecture:</strong> Scalable, secure, and compliant infrastructure</li>
+            <li><strong>Real-time Communication:</strong> Integrated telemedicine capabilities</li>
+        </ul>
+
+        <h2>12.3 Expected Impact</h2>
+        
+        <h3>12.3.1 Healthcare Accessibility</h3>
+        <ul>
+            <li><strong>Geographic Reach:</strong> Extending dermatological care to underserved areas</li>
+            <li><strong>Cost Reduction:</strong> Reducing healthcare costs through early detection</li>
+            <li><strong>Time Efficiency:</strong> Immediate preliminary assessments</li>
+            <li><strong>Health Literacy:</strong> Improving public understanding of skin health</li>
+        </ul>
+
+        <h3>12.3.2 Clinical Benefits</h3>
+        <ul>
+            <li><strong>Early Detection:</strong> Identifying conditions before they become severe</li>
+            <li><strong>Treatment Monitoring:</strong> Tracking treatment effectiveness over time</li>
+            <li><strong>Professional Support:</strong> Connecting users with qualified dermatologists</li>
+            <li><strong>Data-driven Insights:</strong> Population health analytics for research</li>
+        </ul>
+
+        <h2>12.4 Success Metrics</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric Category</th>
+                    <th>Key Performance Indicator</th>
+                    <th>Target Value</th>
+                    <th>Measurement Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Clinical Accuracy</td>
+                    <td>Diagnostic accuracy rate</td>
+                    <td>>85%</td>
+                    <td>Clinical validation studies</td>
+                </tr>
+                <tr>
+                    <td>User Engagement</td>
+                    <td>Monthly active users</td>
+                    <td>100,000+</td>
+                    <td>Analytics tracking</td>
+                </tr>
+                <tr>
+                    <td>User Satisfaction</td>
+                    <td>App store rating</td>
+                    <td>4.5+ stars</td>
+                    <td>App store reviews</td>
+                </tr>
+                <tr>
+                    <td>Performance</td>
+                    <td>Analysis completion time</td>
+                    <td><30 seconds</td>
+                    <td>Performance monitoring</td>
+                </tr>
+                <tr>
+                    <td>Business</td>
+                    <td>Revenue growth</td>
+                    <td>20% monthly</td>
+                    <td>Financial reporting</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>12.5 Future Roadmap</h2>
+        
+        <h3>12.5.1 Short-term Enhancements (6 months)</h3>
+        <ul>
+            <li><strong>Additional Conditions:</strong> Expand AI model to detect 25+ conditions</li>
+            <li><strong>Wearable Integration:</strong> Apple Watch and Android Wear support</li>
+            <li><strong>Multilingual Support:</strong> Support for 10+ languages</li>
+            <li><strong>Advanced Analytics:</strong> Predictive health risk modeling</li>
+        </ul>
+
+        <h3>12.5.2 Long-term Vision (12-24 months)</h3>
+        <ul>
+            <li><strong>Global Expansion:</strong> Regulatory approval in 20+ countries</li>
+            <li><strong>AI Advancement:</strong> Continuous learning and model improvement</li>
+            <li><strong>Research Platform:</strong> Anonymized data for dermatological research</li>
+            <li><strong>Healthcare Integration:</strong> EHR integration with major healthcare systems</li>
+        </ul>
+
+        <h2>12.6 Risk Mitigation</h2>
+        <p>The project incorporates comprehensive risk mitigation strategies including regulatory compliance, security best practices, clinical validation, and continuous monitoring to ensure successful deployment and operation.</p>
+
+        <h2>12.7 Final Recommendations</h2>
+        <p>DermaScanAI is positioned to become a leading mobile health application in the dermatology space. The combination of advanced technology, clinical validation, and user-centered design creates a compelling solution for improving global access to dermatological care. Continued investment in AI model improvement, regulatory compliance, and user experience optimization will be critical for long-term success.</p>
+
+        <div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #FF8E6E;">
+            <h3 style="color: #FF8E6E; margin-bottom: 10px;">Document Information</h3>
+            <p><strong>Document Version:</strong> 1.0</p>
+            <p><strong>Last Updated:</strong> December 2024</p>
+            <p><strong>Next Review:</strong> March 2025</p>
+            <p><strong>Prepared by:</strong> DermaScanAI Development Team</p>
+        </div>
+    </div>
+
+    <script>
+        // Add print functionality
+        function printDocument() {
+            window.print();
+        }
+        
+        // Add smooth scrolling for table of contents
+        document.querySelectorAll('.toc a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
