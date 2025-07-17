@@ -517,6 +517,11 @@ export default function App() {
                 {percentage.toFixed(1)}% • {grade}
               </Text>
             </View>
+            <Image
+              source={{ uri: result.image }}
+              style={{ width: 100, height: 100 }}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.briefButtonsContainer}>
@@ -1282,6 +1287,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
+    marginTop: 20,
   },
   cameraFooter: {
     paddingVertical: 40,
