@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   cameraViewContainerFixed: {
-    flex: 1,
+    aspectRatio: 4 / 3,
     width: "100%",
     backgroundColor: "#000000",
     position: "relative",
