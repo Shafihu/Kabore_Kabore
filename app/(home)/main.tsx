@@ -2,12 +2,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1009,6 +1011,12 @@ export default function App() {
               contentContainerStyle={styles.container}
               showsVerticalScrollIndicator={false}
             >
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => router.back()}
+              >
+                <MaterialIcons name="arrow-back" size={24} color="white" />
+              </TouchableOpacity>
               <View style={styles.header}>
                 <Text style={styles.title}>MCQ Scanner Setup</Text>
               </View>

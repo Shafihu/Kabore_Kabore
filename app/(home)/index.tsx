@@ -37,7 +37,7 @@ export default function GetStartedScreen() {
   ];
 
   function onGetStarted() {
-    router.replace("/(home)/main");
+    router.push("/(home)/main");
   }
 
   return (
