@@ -287,17 +287,45 @@ export default function App() {
 
     try {
       const response = await axios.post(
-        "http://172.20.10.4:3000/process-image",
+        "http://192.168.8.4:3000/process-image",
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
 
+      // Check if the response contains an error
+      if (response.data.error) {
+        Alert.alert("Processing Error", response.data.error);
+        setResult(null);
+        setImage(null);
+        return;
+      }
+
+      // Validate the response data before setting it
+      if (
+        !response.data.score ||
+        !response.data.total ||
+        response.data.total === 0
+      ) {
+        Alert.alert(
+          "Invalid Result",
+          "The processed image did not contain valid exam data. Please try again with a proper answer sheet."
+        );
+        setResult(null);
+        setImage(null);
+        return;
+      }
+
       setResult(response.data);
       setImage(imageUri);
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Processing failed");
+      const errorMessage =
+        error.response?.data?.error ||
+        "Processing failed. Please ensure you're scanning a valid answer sheet.";
+      Alert.alert("Error", errorMessage);
+      setResult(null);
+      setImage(null);
     } finally {
       setLoading(false);
     }
@@ -329,7 +357,27 @@ export default function App() {
 
   const saveResult = async (examResult: ExamResult) => {
     try {
+      // Validate the exam result before saving
+      if (
+        !examResult ||
+        typeof examResult.score !== "number" ||
+        typeof examResult.total !== "number" ||
+        examResult.total === 0 ||
+        examResult.score < 0 ||
+        examResult.score > examResult.total
+      ) {
+        console.error("Invalid exam result data:", examResult);
+        return;
+      }
+
       const percentage = (examResult.score / examResult.total) * 100;
+
+      // Check for NaN or infinite values
+      if (isNaN(percentage) || !isFinite(percentage)) {
+        console.error("Invalid percentage calculated:", percentage);
+        return;
+      }
+
       const grade = calculateGrade(percentage);
 
       const storedResult: StoredExamResult = {
@@ -363,7 +411,33 @@ export default function App() {
       const existingResults = await AsyncStorage.getItem("examResults");
       if (existingResults) {
         const results: StoredExamResult[] = JSON.parse(existingResults);
-        setStoredResults(results);
+
+        // Clean up any invalid results
+        const validResults = results.filter(
+          (result) =>
+            result &&
+            typeof result.percentage === "number" &&
+            !isNaN(result.percentage) &&
+            isFinite(result.percentage) &&
+            result.percentage >= 0 &&
+            result.percentage <= 100 &&
+            typeof result.score === "number" &&
+            typeof result.total === "number" &&
+            result.total > 0
+        );
+
+        // If we filtered out invalid results, save the cleaned data
+        if (validResults.length !== results.length) {
+          await AsyncStorage.setItem(
+            "examResults",
+            JSON.stringify(validResults)
+          );
+          console.log(
+            `Cleaned up ${results.length - validResults.length} invalid results`
+          );
+        }
+
+        setStoredResults(validResults);
       }
     } catch (error) {
       console.error("Error loading results:", error);
@@ -388,12 +462,40 @@ export default function App() {
       };
     }
 
-    const totalExams = storedResults.length;
+    // Filter out any invalid results that might have been saved
+    const validResults = storedResults.filter(
+      (result) =>
+        result &&
+        typeof result.percentage === "number" &&
+        !isNaN(result.percentage) &&
+        isFinite(result.percentage) &&
+        result.percentage >= 0 &&
+        result.percentage <= 100
+    );
+
+    if (validResults.length === 0) {
+      return {
+        totalExams: 0,
+        averageScore: 0,
+        passRate: 0,
+        gradeDistribution: {
+          A: 0,
+          B: 0,
+          C: 0,
+          D: 0,
+          E: 0,
+          F: 0,
+        },
+        recentExams: [],
+      };
+    }
+
+    const totalExams = validResults.length;
     const averageScore =
-      storedResults.reduce((sum, result) => sum + result.percentage, 0) /
+      validResults.reduce((sum, result) => sum + result.percentage, 0) /
       totalExams;
     const passRate =
-      (storedResults.filter((result) => result.percentage >= 40).length /
+      (validResults.filter((result) => result.percentage >= 40).length /
         totalExams) *
       100;
 
@@ -406,11 +508,13 @@ export default function App() {
       F: 0,
     };
 
-    storedResults.forEach((result) => {
-      gradeDistribution[result.grade as keyof typeof gradeDistribution]++;
+    validResults.forEach((result) => {
+      if (result.grade && gradeDistribution.hasOwnProperty(result.grade)) {
+        gradeDistribution[result.grade as keyof typeof gradeDistribution]++;
+      }
     });
 
-    const recentExams = storedResults
+    const recentExams = validResults
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10);
 
@@ -480,7 +584,8 @@ export default function App() {
             </Text>
             <Text style={styles.instructionText}>
               • Align within the 4:3 frame{"\n"}• Ensure good lighting{"\n"}•
-              Keep sheet flat and visible
+              Keep sheet flat and visible{"\n"}• Use dark pen/marker for answers
+              {"\n"}• Ensure clear borders on answer sheet
             </Text>
           </View>
         </Animated.View>
@@ -859,10 +964,11 @@ export default function App() {
                 ) : (
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyStateText}>
-                      No exams analyzed yet
+                      No valid exams analyzed yet
                     </Text>
                     <Text style={styles.emptyStateSubtext}>
-                      Scan some answer sheets to see analysis
+                      Scan some answer sheets to see analysis. Make sure to use
+                      clear, well-lit images of answer sheets.
                     </Text>
                   </View>
                 )}
@@ -1113,7 +1219,7 @@ export default function App() {
                           ? `${storedResults.length} exam${
                               storedResults.length > 1 ? "s" : ""
                             } analyzed`
-                          : "No exams analyzed yet"}
+                          : "No valid exams analyzed yet"}
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>

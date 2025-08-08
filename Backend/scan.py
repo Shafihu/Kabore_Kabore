@@ -89,7 +89,7 @@ def main():
 
         rectCon = rectContour(contours)
         if not rectCon:
-            print(json.dumps({"error": "No document detected"}))
+            print(json.dumps({"error": "No answer sheet detected. Please ensure the image contains a clear, well-lit answer sheet with visible borders."}))
             return
 
         # Get corner points
@@ -99,7 +99,7 @@ def main():
 
         biggestContour = getCornerPoints(rectCon[0])
         if biggestContour.size == 0:
-            print(json.dumps({"error": "Could not detect document corners"}))
+            print(json.dumps({"error": "Could not detect answer sheet corners. Please ensure the answer sheet is clearly visible and not too blurry."}))
             return
 
         # Reorder points
@@ -173,6 +173,12 @@ def main():
         grading = [1 if ans[q] == myIndex[q] else 0 for q in range(no_questions)]
         score = sum(grading)
 
+        # Validate that we detected some answers
+        total_detected = sum([1 for row in myPixelVal if np.max(row) > 0.01])  # Threshold for detection
+        if total_detected < no_questions * 0.5:  # At least 50% of questions should have detected answers
+            print(json.dumps({"error": "Insufficient answer markings detected. Please ensure the answer sheet has clear, dark markings and good contrast."}))
+            return
+
         # Create visualization
         imgVisualization = np.zeros_like(imgWarpColored)
         
@@ -220,7 +226,8 @@ def main():
         print(json.dumps(result))
 
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        error_msg = f"Processing failed: {str(e)}. Please ensure you're scanning a valid answer sheet with good lighting and clear markings."
+        print(json.dumps({"error": error_msg}))
         return
 
 if __name__ == "__main__":
